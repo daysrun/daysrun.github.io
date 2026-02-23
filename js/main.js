@@ -9,6 +9,7 @@ import Settings from './settings.js';
 // module-level singletons (created in main.js)
 let map = null;
 let trackManager = null;
+let menu = null;
 const activeTrackViews = new Map(); // trackId -> { trackView, unregister }
 
 /**
@@ -44,22 +45,64 @@ async function createTrackView(trackId, trackColour, centerMap = false, dashboar
     return { trackView: tv, trackId, unregister };
 }
 
-async function initMap() {
+async function initMap(settings = null) {
     // Request libraries when needed, not in the script tag.
     // Load required Google Maps libraries (symbols are used via global google namespace)
+    await google.maps.importLibrary("core");
     await google.maps.importLibrary("maps");
     await google.maps.importLibrary("marker");
 
     const position = { lat: 44.74979194815116, lng: -79.8512010048997 };    // Wye Heritage Marina
 
+    // Determine color scheme based on theme setting
+    let colorScheme = google.maps.ColorScheme.FOLLOW_SYSTEM;
+    if (settings) {
+        const theme = settings.get('theme');
+        colorScheme = theme === 'dark' ? google.maps.ColorScheme.DARK : google.maps.ColorScheme.LIGHT;
+    }
+
     // The map, centered at position
     return new google.maps.Map(document.getElementById("map"), {
         zoom: 12,
         center: position,
-        mapId: "cf429fad5670f355c2f94461",
+        mapId: "d79157190202fad31292f2ce",
+        colorScheme: colorScheme,
         disableDefaultUI: true,
         mapTypeId: 'terrain',
     });
+}
+
+/**
+ * Reinitialize the map with a new color scheme. Since colorScheme cannot be
+ * changed dynamically on an existing map, we must create a new map instance
+ * and restore the state (zoom level, center, active tracks) from the old one.
+ * @param {Object} oldMap - The existing map to replace
+ * @param {Object} settings - Settings object for reading configuration
+ * @returns {Promise<Object>} The new map instance
+ */
+async function reinitializeMapForTheme(oldMap, settings) {
+    if (!oldMap) return null;
+
+    // Preserve the current state
+    const zoom = oldMap.getZoom();
+    const center = oldMap.getCenter();
+    const bounds = oldMap.getBounds();
+
+    // const { ColorScheme } = await google.maps.importLibrary("core");
+    const theme = settings.get('theme');
+    const colorScheme = theme === 'dark' ? google.maps.ColorScheme.DARK : google.maps.ColorScheme.LIGHT;
+
+    // Create new map with new color scheme
+    const newMap = new google.maps.Map(document.getElementById("map"), {
+        zoom: zoom,
+        center: center,
+        mapId: "d79157190202fad31292f2ce",
+        colorScheme: colorScheme,
+        disableDefaultUI: true,
+        mapTypeId: 'terrain',
+    });
+
+    return newMap;
 }
 
 async function initTrackManager() {
@@ -84,7 +127,11 @@ function getRuntimeConfig() {
 }
 
 // Initialize the application
-initMap().then(async (m) => {
+// Create Settings instance first so it can be passed to initMap
+const settings = new Settings();
+settings.applySettings();
+
+initMap(settings).then(async (m) => {
     // assign module-level singleton map
     map = m;
     map.addListener('idle', () => {
@@ -100,12 +147,36 @@ initMap().then(async (m) => {
         });
     });
 
+    // Register listener to update map theme when settings change
+    settings.addListener('theme', async () => {
+        const newMap = await reinitializeMapForTheme(map, settings);
+        if (newMap) {
+            map = newMap;
+            // Re-attach event listeners to the new map instance
+            map.addListener('idle', () => {
+                activeTrackViews.forEach(entry => entry.trackView.updateMarkers());
+            });
+            map.addListener('click', () => {
+                activeTrackViews.forEach(entry => {
+                    if (entry.trackView.infoWindow) {
+                        entry.trackView.infoWindow.close();
+                    }
+                });
+            });
+            // Update all active TrackViews to use the new map
+            activeTrackViews.forEach(entry => {
+                entry.trackView.setMap(newMap);
+            });
+            // Update menu with new map
+            if (menu) {
+                menu.setMap(newMap);
+            }
+            console.log(`Theme changed to ${settings.get('theme')}, reinitalized map`);
+        }
+    });
+
     // Initialize TrackManager and create initial TrackView
     await initTrackManager();
-
-    // Create Settings instance and apply initial settings
-    const settings = new Settings();
-    settings.applySettings();
 
     // Create a NavDashboard instance and initialize it. We'll pass this
     // instance into TrackView when following the live track so TrackView
@@ -194,7 +265,7 @@ initMap().then(async (m) => {
         fitAllActiveTracks();
     };
     // Create the map menu UI and populate with tracks
-    const menu = new MapMenu(
+    menu = new MapMenu(
         map,
         async (trackId, checked) => {
             try {

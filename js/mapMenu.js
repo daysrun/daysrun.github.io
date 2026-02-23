@@ -429,6 +429,33 @@ export default class MapMenu {
         }
     }
 
+    /**
+     * Attach the menu to a new map instance (e.g., when reinitializing for theme change)
+     * @param {google.maps.Map} newMap - The new map to attach to
+     */
+    setMap(newMap) {
+        if (!newMap) return;
+
+        // Remove from old map if it exists
+        if (this.map) {
+            try {
+                const controls = this.map.controls[google.maps.ControlPosition.TOP_LEFT];
+                for (let i = 0; i < controls.getLength(); i++) {
+                    if (controls.getAt(i) === this.container) {
+                        controls.removeAt(i);
+                        break;
+                    }
+                }
+            } catch (err) {
+                // ignore
+            }
+        }
+
+        // Update to new map and re-attach
+        this.map = newMap;
+        this.map.controls[google.maps.ControlPosition.TOP_LEFT].push(this.container);
+    }
+
     static beautifyTrackId(trackId) {
         // Example: convert "20240615-1234" to "2024-06-15"
         const match = trackId.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/);

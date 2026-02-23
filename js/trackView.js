@@ -110,7 +110,7 @@ export default class TrackView {
             gmpClickable: true,
         });
         this.setMarkerDiameter(marker, TrackView.getMarkerDiameter(this.map.getZoom()));
-        marker.addListener("click", () => {
+        marker.addEventListener("gmp-click", () => {
             if (this.infoWindow.anchor === marker) {
                 this.infoWindow.close();
             } else {
@@ -246,5 +246,21 @@ export default class TrackView {
         } catch (err) {
             console.error('Error destroying TrackView:', err);
         }
+    }
+
+    /**
+     * Set a new map and re-attach all polylines and markers.
+     * Used when the map needs to be reinitialized (e.g., for theme changes).
+     * @param {google.maps.Map} newMap - The new map instance
+     */
+    setMap(newMap) {
+        if (!newMap) return;
+        this.map = newMap;
+        // Re-attach the polyline to the new map
+        this.track.setMap(this.map);
+        // Re-attach all markers to the new map
+        this.markers.forEach(marker => {
+            marker.setMap(this.map);
+        });
     }
 }
