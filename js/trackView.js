@@ -125,11 +125,14 @@ export default class TrackView {
                         );
                     }
                 }
+
+                // Get theme from settings to apply appropriate styles
+                const isDarkTheme = this.settings && this.settings.get('theme') === 'dark';
                 this.infoWindow.setContent(`
-                    <html>
+                    <div class="info-window-content${isDarkTheme ? '-dark' : ''}">
                         <strong>${ts}</strong><br>
                         ${metadataLines.join('<br>')}
-                    </html>
+                    </div>
                 `);
                 this.infoWindow.open(marker.map, marker);
             }

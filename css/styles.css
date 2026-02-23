@@ -70,3 +70,22 @@ body.dark-theme footer {
     color: #999;
     border-top-color: #333;
 }
+
+.info-window-content {
+    color: black;
+    background-color: white;
+    padding: 8px;
+}
+
+.info-window-content strong {
+    font-weight: bold;
+}
+
+.info-window-content-dark {
+    color: white;
+    background-color: #333;
+}
+
+.info-window-content-dark strong {
+    font-weight: bold;
+}

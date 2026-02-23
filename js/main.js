@@ -171,7 +171,6 @@ initMap(settings).then(async (m) => {
             if (menu) {
                 menu.setMap(newMap);
             }
-            console.log(`Theme changed to ${settings.get('theme')}, reinitalized map`);
         }
     });
 
