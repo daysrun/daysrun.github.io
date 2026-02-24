@@ -12,7 +12,7 @@ export class UnitManager {
 		switch (key) {
 			case 'Depth':
 				// Depth conversion
-				if (value >= 42000000) {
+				if (value === undefined || value === null || isNaN(value) || value >= 42000000) {
 					return { value: '--', unit: targetUnit || 'm', unitSpace: ' ' };
 				}
 				if (targetUnit === 'feet') {
