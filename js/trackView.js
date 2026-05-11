@@ -26,9 +26,11 @@ export default class TrackView {
         return TrackView.arrowSvgCache.replace(/FILL_COLOR/g, colour);
     }
 
-    constructor(map, trackColour, centerMap, dashboard=null, onBoundsChange=null, settings=null) {
+    constructor(map, trackColour, centerMap, dashboard=null, onBoundsChange=null, settings=null, trackId=null) {
         this.map = map;
         this.trackColour = trackColour;
+        this.startTime = null;
+        this.endTime = null;
         this.trackPoints = [];
         this.infoWindow = new google.maps.InfoWindow();
         this.markers = [];
@@ -37,6 +39,8 @@ export default class TrackView {
         this.distance = 0;
         this.onBoundsChange = onBoundsChange;
         this.settings = settings;
+        this.trackId = trackId;
+        this.meta = null; // cache for meta data
         // If a NavDashboard instance was provided, ensure it's visible so TrackView
         // can update tiles immediately. The dashboard instance is expected to have
         // been initialized by the caller (main.js).
@@ -54,12 +58,116 @@ export default class TrackView {
         // create the polyline
         this.track = new google.maps.Polyline({
             geodesic: true,
-            clickable: false,
+            clickable: true,
             strokeColor: trackColour,
             strokeOpacity: 1.0,
             strokeWeight: 6,
         });
         this.track.setMap(this.map);
+
+        // Add click listener for meta popup
+        this.track.addListener('click', (event) => {
+            this.handleTrackClick(event);
+        });
+    }
+
+    async handleTrackClick(event) {
+        if (!this.trackId) return;
+
+        // Fetch meta if not already cached
+        if (this.meta === null) {
+            this.meta = await this.fetchMetaData();
+        }
+
+        // Close any open info window
+        if (this.infoWindow) {
+            this.infoWindow.close();
+        }
+
+        const metaLines = [];
+
+        // Track distance may be in meta or top-level Distance property; prefer top-level if available
+        const trackDistance = this.distance || this.meta.Distance || 0;
+        const convertedDistance = UnitManager.convertValue('Distance', trackDistance, this._getTargetUnit('Distance'));
+        metaLines.push(`<strong>Distance:</strong> ${convertedDistance.value}${convertedDistance.unitSpace}${convertedDistance.unit}`);
+
+        // Compute track time and average speed from distance and the timestamps of the first and last points if possible
+        if (this.trackPoints.length >= 2) {
+            if (this.startTime && this.endTime && this.endTime > this.startTime) {
+                const timeSeconds = (this.endTime - this.startTime) / 1000;
+                const speed = trackDistance / timeSeconds; // distance per second
+                const convertedSpeed = UnitManager.convertValue('SOG', speed, this._getTargetUnit('SOG'));
+                metaLines.push(`<strong>Average Speed:</strong> ${convertedSpeed.value}${convertedSpeed.unitSpace}${convertedSpeed.unit}`);
+                metaLines.push(`<strong>Track Time:</strong> ${Math.floor(timeSeconds / 3600)}h ${Math.floor((timeSeconds % 3600) / 60)}m ${Math.floor(timeSeconds % 60)}s`);
+            }
+        }
+
+        if (this.meta) {
+            // Format meta data for display
+            // Sample meta: {"maxSpeed":5.0}
+            if (this.meta.maxSpeed !== undefined) {
+                const converted = UnitManager.convertValue('SOG', this.meta.maxSpeed, this._getTargetUnit('SOG'));
+                metaLines.push(`<strong>Max Speed:</strong> ${converted.value}${converted.unitSpace}${converted.unit}`);
+            }
+
+            // Include any other meta fields that may be present
+            for (const key in this.meta) {
+                if (['maxSpeed'].includes(key)) continue; // already handled
+                metaLines.push(`<strong>${key}:</strong> ${this.meta[key]}`);
+            }
+        }
+
+        // Point count
+        metaLines.push(`<strong>Point Count:</strong> ${this.trackPoints.length}`);
+
+        // Get theme from settings
+        const isDarkTheme = this.settings && this.settings.get('theme') === 'dark';
+        this.infoWindow.setContent(`
+            <div class="info-window-content${isDarkTheme ? '-dark' : ''}">
+                <strong>Track Meta Data</strong><br>
+                ${metaLines.join('<br>')}
+            </div>
+        `);
+        this.infoWindow.setPosition(event.latLng);
+        this.infoWindow.open(this.map);
+    }
+
+    async fetchMetaData() {
+        if (!this.trackId || this.trackId.length < 4) return null;
+
+        const year = this.trackId.slice(0, 4);
+        const dataUrl = this.getDataUrl();
+        const url = `${dataUrl}/${year}.ndjson`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) return null;
+
+            const text = await response.text();
+            const lines = text.trim().split('\n');
+            for (const line of lines) {
+                try {
+                    const entry = JSON.parse(line);
+                    if (entry.id === this.trackId && entry.meta) {
+                        return entry.meta;
+                    }
+                } catch (e) {
+                    // ignore parse errors
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching meta data:', error);
+        }
+        return null;
+    }
+
+    getDataUrl() {
+        // This should match the logic in main.js getRuntimeConfig
+        const isProd = window.location.href.includes('https://daysrun.github.io');
+        const urlParams = new URLSearchParams(window.location.search);
+        const param = urlParams.get('branch');
+        const branch = param ? param : 'main';
+        return isProd ? `https://daysrun.github.io/shipslog/killick/${branch}` : `shipslog/killick`;
     }
 
     placeMarker(pointData, svg) {
@@ -146,6 +254,11 @@ export default class TrackView {
      */
     async processPoints(points) {
         if (!points || points.length === 0) return;
+
+        if (points.length >= 1) {
+            this.startTime = points[0].timestamp ? new Date(points[0].timestamp) : null;
+            this.endTime = points[points.length - 1].timestamp ? new Date(points[points.length - 1].timestamp) : null;
+        }
 
         // Load arrow SVG once
         const arrowSvg = await TrackView.loadArrowSvg(this.trackColour);

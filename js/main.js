@@ -27,7 +27,7 @@ async function createTrackView(trackId, trackColour, centerMap = false, dashboar
         throw new Error('createTrackView called before TrackManager initialization');
     }
 
-    const tv = new TrackView(map, trackColour, centerMap, dashboard, onBoundsChange, settings);
+    const tv = new TrackView(map, trackColour, centerMap, dashboard, onBoundsChange, settings, trackId);
 
     // Add to activeTrackViews first so it's included if callback fires during registerListener
     // Create a placeholder entry that will be updated with unregister function
