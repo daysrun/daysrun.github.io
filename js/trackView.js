@@ -167,7 +167,7 @@ export default class TrackView {
         const urlParams = new URLSearchParams(window.location.search);
         const param = urlParams.get('branch');
         const branch = param ? param : 'main';
-        return isProd ? `https://daysrun.github.io/shipslog/killick/${branch}` : `shipslog/killick`;
+        return isProd ? `https://daysrun.github.io/shipslog/${branch}` : `shipslog`;
     }
 
     placeMarker(pointData, svg) {
