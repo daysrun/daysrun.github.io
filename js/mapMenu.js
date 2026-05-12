@@ -113,6 +113,10 @@ export default class MapMenu {
             this.trackManager.registerBoatsListener((boats) => {
                 this._updateBoatsSection(boats);
             });
+            // Register listener for tracks changes
+            this.trackManager.registerTracksListener((sectionId, tracks) => {
+                this.updateSection(sectionId, tracks);
+            });
         }
 
         // Default: open menu on load

@@ -9,6 +9,8 @@
 // - Per-track listeners registered via registerListener(trackId, listener)
 //   receive the full points array on registration and incremental point arrays
 //   (deltas) when new points are appended.
+import BoatManager from './boatManager.js';
+
 export default class TrackManager {
     constructor(baseUrl, pollInterval, logger) {
         // Map: sectionId (e.g., year) -> Array<track metadata>
@@ -21,8 +23,6 @@ export default class TrackManager {
         this.tracksListeners = new Set();
         // listeners for live track changes
         this.liveTrackListeners = new Set();
-        // listeners for boats changes
-        this.boatsListeners = new Set();
         // base URL provided by main.js
         this.baseUrl = baseUrl?.replace(/\/$/, '') || '';
         this.pollInterval = pollInterval;
@@ -33,105 +33,54 @@ export default class TrackManager {
         this.sectionTracks = new Map();
         // Per-section (year) last-edited timestamps cache
         this.sectionTimestamps = new Map();
-        // Boats last-edited timestamp cache
-        this.boatsTimestamp = new Date(0);
-        // Boat selection state
-        this.selectedBoats = new Set();
-        this.allBoats = new Set();
-        this.boatsLoaded = false;
+        // Boat manager instance
+        this.boatManager = new BoatManager(baseUrl, logger);
     }
 
     /**
      * Load boats from boats.ndjson and initialize selection
      */
     async loadBoats() {
-        if (this.boatsLoaded) return;
-
-        try {
-            const boats = await this._fetchNdjsonOrJson('boats', null);
-            this.allBoats = new Set(boats.map(boat => boat.name));
-            // Load selection from cookie, default to all selected
-            this.selectedBoats = this.loadBoatSelectionFromCookie();
-            if (this.selectedBoats.size === 0) {
-                this.selectedBoats = new Set(this.allBoats);
-                this.saveBoatSelectionToCookie();
-            }
-            this.boatsLoaded = true;
-            this.logger.debug('Boats loaded:', Array.from(this.allBoats));
-        } catch (e) {
-            this.logger.error('Failed to load boats:', e);
-            // Fallback: assume no boat filtering
-            this.allBoats = new Set();
-            this.selectedBoats = new Set();
-            this.boatsLoaded = true;
-        }
+        return this.boatManager.loadBoats();
     }
 
     /**
      * Get all available boats
      */
     getAllBoats() {
-        return Array.from(this.allBoats).sort();
+        return this.boatManager.getAllBoats();
     }
 
     /**
      * Get currently selected boats
      */
     getSelectedBoats() {
-        return Array.from(this.selectedBoats);
+        return this.boatManager.getSelectedBoats();
     }
 
     /**
      * Set boat selection
      */
     setBoatSelection(selectedBoats) {
-        this.selectedBoats = new Set(selectedBoats);
-        this.saveBoatSelectionToCookie();
+        this.boatManager.setBoatSelection(selectedBoats);
         // Re-filter all existing tracks
         this._refilterAllTracks();
     }
 
     /**
-     * Load boat selection from cookie
+     * Register a listener for boats changes
+     * @param {Function} listener - Function(boatsArray: Array) called when boats list changes
+     * @returns {Function} Unregister function
      */
-    loadBoatSelectionFromCookie() {
-        try {
-            const cookieValue = document.cookie
-                .split('; ')
-                .find(row => row.startsWith('selectedBoats='));
-            if (cookieValue) {
-                const selected = JSON.parse(decodeURIComponent(cookieValue.split('=')[1]));
-                return new Set(selected);
-            }
-        } catch (e) {
-            this.logger.error('Failed to load boat selection from cookie:', e);
-        }
-        return new Set();
-    }
-
-    /**
-     * Save boat selection to cookie
-     */
-    saveBoatSelectionToCookie() {
-        try {
-            const selectedArray = Array.from(this.selectedBoats);
-            document.cookie = `selectedBoats=${encodeURIComponent(JSON.stringify(selectedArray))}; path=/; max-age=31536000`; // 1 year
-        } catch (e) {
-            this.logger.error('Failed to save boat selection to cookie:', e);
-        }
+    registerBoatsListener(listener) {
+        return this.boatManager.registerBoatsListener(listener);
     }
 
     /**
      * Filter tracks based on selected boats
      */
     _filterTracksByBoats(tracks) {
-        if (this.selectedBoats.size === 0 || this.allBoats.size === 0) {
-            return tracks; // No filtering if no boats loaded or none selected
-        }
-        return tracks.filter(track =>
-            // Always include the live track, regardless of boat selection
-            track.id === this.liveTrackId || (track.boatName && this.selectedBoats.has(track.boatName))
-        );
+        return this.boatManager.filterTracksByBoats(tracks, this.liveTrackId);
     }
 
     /**
@@ -151,6 +100,22 @@ export default class TrackManager {
     }
 
     /**
+     * Check if there is currently a live track
+     * @returns {boolean}
+     */
+    hasLiveTrack() {
+        return this.liveTrackId !== null;
+    }
+
+    /**
+     * Get the current live track ID
+     * @returns {string|null}
+     */
+    getLiveTrackId() {
+        return this.liveTrackId;
+    }
+
+    /**
      * Clean up resources
      */
     destroy() {
@@ -162,6 +127,10 @@ export default class TrackManager {
         // Unregister all listeners
         this.tracksListeners.clear();
         this.liveTrackListeners.clear();
+        // Clean up boat manager
+        if (this.boatManager) {
+            this.boatManager.destroy();
+        }
     }
 
     /**
@@ -266,33 +235,28 @@ export default class TrackManager {
     }
 
     /**
+     * Register a listener for live track changes
+     * @param {Function} listener - Function(liveTrackId: string|null) called when live track changes
+     * @returns {Function} Unregister function
+     */
+    registerLiveTrackListener(listener) {
+        this.liveTrackListeners.add(listener);
+        // Immediately call with current live track
+        try {
+            listener(this.liveTrackId);
+        } catch (e) {
+            this.logger.error('live track listener immediate call failed', e);
+        }
+        return () => { this.liveTrackListeners.delete(listener); };
+    }
+
+    /**
      * Register a listener for boats changes
      * @param {Function} listener - Function(boatsArray: Array) called when boats list changes
      * @returns {Function} Unregister function
      */
     registerBoatsListener(listener) {
-        this.boatsListeners.add(listener);
-        // Immediately call with current boats
-        try {
-            listener(Array.from(this.allBoats));
-        } catch (e) {
-            this.logger.error('boats listener immediate call failed', e);
-        }
-        return () => { this.boatsListeners.delete(listener); };
-    }
-
-    /**
-     * Helper method to check if two sets are equal
-     * @param {Set} setA
-     * @param {Set} setB
-     * @returns {boolean}
-     */
-    _setsEqual(setA, setB) {
-        if (setA.size !== setB.size) return false;
-        for (const item of setA) {
-            if (!setB.has(item)) return false;
-        }
-        return true;
+        return this.boatManager.registerBoatsListener(listener);
     }
 
     /**
@@ -407,47 +371,7 @@ export default class TrackManager {
                 }
 
                 // Check for boats updates
-                if (updateData.boats) {
-                    const boatsEditedIso = updateData.boats.edited;
-                    let boatsEditedTs = null;
-                    if (boatsEditedIso) {
-                        try { boatsEditedTs = new Date(boatsEditedIso); } catch (e) { boatsEditedTs = null; }
-                    }
-
-                    if (boatsEditedTs && boatsEditedTs > this.boatsTimestamp) {
-                        // Boats file updated — reload it
-                        try {
-                            const boats = await this._fetchNdjsonOrJson('boats', null);
-                            const newBoatsSet = new Set(boats.map(boat => boat.name));
-
-                            // Check if boats list has changed
-                            const boatsChanged = !this._setsEqual(this.allBoats, newBoatsSet);
-
-                            if (boatsChanged) {
-                                this.allBoats = newBoatsSet;
-                                // Update selected boats to include any new boats
-                                const updatedSelectedBoats = new Set(this.selectedBoats);
-                                for (const boatName of this.allBoats) {
-                                    if (!this.selectedBoats.has(boatName)) {
-                                        updatedSelectedBoats.add(boatName);
-                                    }
-                                }
-                                this.selectedBoats = updatedSelectedBoats;
-                                this.saveBoatSelectionToCookie();
-
-                                // Notify that boats have changed (we'll need to add a listener for this)
-                                this._safeNotify(this.boatsListeners || new Set(), 'boats', Array.from(this.allBoats));
-
-                                this.logger.info('Boats list updated');
-                            }
-
-                            // Update timestamp cache
-                            this.boatsTimestamp = boatsEditedTs;
-                        } catch (e) {
-                            this.logger.error('Failed to reload boats:', e);
-                        }
-                    }
-                }
+                await this.boatManager.checkForBoatsUpdates(updateData);
 
                 // Check for live track updates (if applicable)
                 const liveTrackId = updateData.live?.id || null;
