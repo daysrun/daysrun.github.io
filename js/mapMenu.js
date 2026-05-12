@@ -74,7 +74,7 @@ export default class MapMenu {
         this.body.appendChild(this.liveSection.container);
 
         // Create Boats section
-        this.boatsSection = this._createSection('Boats', 'boats');
+        this.boatsSection = this._createSection('Boat Filter', 'boats');
         this._populateBoatsSection();
         this.body.appendChild(this.boatsSection.container);
 
