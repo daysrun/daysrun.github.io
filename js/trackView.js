@@ -84,6 +84,9 @@ export default class TrackView {
             this.infoWindow.close();
         }
 
+        const boatName = this.meta ? this.meta.boatName || 'Unknown' : 'Unknown';
+        const dateStr = this.trackId ? `${this.trackId.slice(0,4)}-${this.trackId.slice(4,6)}-${this.trackId.slice(6,8)}` : 'N/A';
+
         const metaLines = [];
 
         // Track distance may be in meta or top-level Distance property; prefer top-level if available
@@ -112,7 +115,7 @@ export default class TrackView {
 
             // Include any other meta fields that may be present
             for (const key in this.meta) {
-                if (['maxSpeed'].includes(key)) continue; // already handled
+                if (['maxSpeed', 'Distance', 'boatName', 'id', 'pointCount'].includes(key)) continue; // already handled or not to show
                 metaLines.push(`<strong>${key}:</strong> ${this.meta[key]}`);
             }
         }
@@ -124,7 +127,7 @@ export default class TrackView {
         const isDarkTheme = this.settings && this.settings.get('theme') === 'dark';
         this.infoWindow.setContent(`
             <div class="info-window-content${isDarkTheme ? '-dark' : ''}">
-                <strong>Track Meta Data</strong><br>
+                <span style="font-weight: bold; font-size: 1.2em;">${boatName} - ${dateStr}</span><br><br>
                 ${metaLines.join('<br>')}
             </div>
         `);
@@ -148,8 +151,8 @@ export default class TrackView {
             for (const line of lines) {
                 try {
                     const entry = JSON.parse(line);
-                    if (entry.id === this.trackId && entry.meta) {
-                        return entry.meta;
+                    if (entry.id === this.trackId) {
+                        return entry;
                     }
                 } catch (e) {
                     // ignore parse errors
