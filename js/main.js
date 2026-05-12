@@ -120,7 +120,7 @@ function getRuntimeConfig() {
     const param = urlParams.get('branch');
     const branch = param ? param : 'main';
     return {
-        dataUrl: isProd ? `https://daysrun.github.io/shipslog/killick/${branch}` : `shipslog/killick`,
+        dataUrl: isProd ? `https://daysrun.github.io/shipslog/${branch}` : `shipslog`,
         pollInterval: isProd ? 60000 : 5000,
         logger: new Logger(isProd ? Logger.ENVIRONMENTS.PROD : Logger.ENVIRONMENTS.DEV, 'TrackManager'),
     };
