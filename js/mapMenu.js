@@ -5,7 +5,7 @@ export default class MapMenu {
     /**
      * @param {google.maps.Map} map
      * @param {Function} onChange - Callback (trackId, checked) when checkbox toggled
-     * @param {Object} options - {hasLiveTrack: boolean, liveTrackId: string|null, settings: Settings, onUnitsChanged: Function}
+     * @param {Object} options - {hasLiveTrack: boolean, liveTrackId: string|null, settings: Settings, onUnitsChanged: Function, trackManager: TrackManager}
      */
     constructor(map, onChange = () => {}, options = {}) {
         this.map = map;
@@ -13,6 +13,7 @@ export default class MapMenu {
         this.onLiveTrackFollowChange = options.onLiveTrackFollowChange || (() => {});
         this.onUnitsChanged = options.onUnitsChanged || (() => {});
         this.settings = options.settings || null;
+        this.trackManager = options.trackManager || null;
         this.container = document.createElement('div');
         this.container.className = 'map-menu-container';
         this.swatchColours = new Map();
@@ -72,6 +73,11 @@ export default class MapMenu {
         this.liveSection.content.appendChild(liveContent);
         this.body.appendChild(this.liveSection.container);
 
+        // Create Boats section
+        this.boatsSection = this._createSection('Boats', 'boats');
+        this._populateBoatsSection();
+        this.body.appendChild(this.boatsSection.container);
+
         // Sections map: sectionId -> { section, list, title }
         // Sections (including any 'Log'-like groups) must be added explicitly via addSection()
         this.sections = new Map();
@@ -100,6 +106,13 @@ export default class MapMenu {
             this.settings.addListener('speedUnit', () => this._handleUnitsChanged());
             this.settings.addListener('depthUnit', () => this._handleUnitsChanged());
             this.settings.addListener('distanceUnit', () => this._handleUnitsChanged());
+        }
+
+        // Register listener for boats changes
+        if (this.trackManager) {
+            this.trackManager.registerBoatsListener((boats) => {
+                this._updateBoatsSection(boats);
+            });
         }
 
         // Default: open menu on load
@@ -610,6 +623,96 @@ export default class MapMenu {
         ));
 
         this.settingsSection.content.appendChild(content);
+    }
+
+    /**
+     * Populate the boats section with boat selection checkboxes
+     */
+    _populateBoatsSection() {
+        if (!this.trackManager) return;
+
+        const boats = this.trackManager.getAllBoats();
+        this._populateBoatsSectionWithBoats(boats);
+    }
+
+    /**
+     * Update the boats section with a new list of boats
+     * @param {Array} boats - Array of boat names
+     */
+    _updateBoatsSection(boats) {
+        if (!this.boatsSection) return;
+
+        // Clear existing content
+        this.boatsSection.content.innerHTML = '';
+
+        // Re-populate with new boats
+        this._populateBoatsSectionWithBoats(boats);
+    }
+
+    /**
+     * Populate the boats section content with the given boats
+     * @param {Array} boats - Array of boat names
+     */
+    _populateBoatsSectionWithBoats(boats) {
+        if (!this.trackManager) return;
+
+        const content = document.createElement('div');
+        content.className = 'map-menu-boats-content';
+
+        const selectedBoats = new Set(this.trackManager.getSelectedBoats());
+
+        boats.forEach(boatName => {
+            const row = document.createElement('div');
+            row.className = 'map-menu-row';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.dataset.boatName = boatName;
+            input.className = 'map-menu-checkbox';
+            input.checked = selectedBoats.has(boatName);
+
+            const label = document.createElement('label');
+            label.textContent = boatName;
+            label.className = 'map-menu-label';
+
+            input.addEventListener('change', (ev) => {
+                const checked = ev.target.checked;
+                const boatName = ev.target.dataset.boatName;
+                this._handleBoatSelectionChange(boatName, checked);
+            });
+
+            // clicking label toggles checkbox
+            label.addEventListener('click', () => input.click());
+
+            row.appendChild(input);
+            row.appendChild(label);
+            content.appendChild(row);
+        });
+
+        this.boatsSection.content.appendChild(content);
+    }
+
+    /**
+     * Handle boat selection change
+     */
+    _handleBoatSelectionChange(boatName, checked) {
+        const selectedBoats = new Set(this.trackManager.getSelectedBoats());
+        if (checked) {
+            selectedBoats.add(boatName);
+        } else {
+            selectedBoats.delete(boatName);
+        }
+        this.trackManager.setBoatSelection(Array.from(selectedBoats));
+    }
+
+    /**
+     * Refresh the boats section (useful if boats are loaded after menu creation)
+     */
+    refreshBoatsSection() {
+        if (!this.trackManager || !this.boatsSection) return;
+
+        const boats = this.trackManager.getAllBoats();
+        this._updateBoatsSection(boats);
     }
 
     /**

@@ -21,6 +21,8 @@ export default class TrackManager {
         this.tracksListeners = new Set();
         // listeners for live track changes
         this.liveTrackListeners = new Set();
+        // listeners for boats changes
+        this.boatsListeners = new Set();
         // base URL provided by main.js
         this.baseUrl = baseUrl?.replace(/\/$/, '') || '';
         this.pollInterval = pollInterval;
@@ -31,6 +33,121 @@ export default class TrackManager {
         this.sectionTracks = new Map();
         // Per-section (year) last-edited timestamps cache
         this.sectionTimestamps = new Map();
+        // Boats last-edited timestamp cache
+        this.boatsTimestamp = new Date(0);
+        // Boat selection state
+        this.selectedBoats = new Set();
+        this.allBoats = new Set();
+        this.boatsLoaded = false;
+    }
+
+    /**
+     * Load boats from boats.ndjson and initialize selection
+     */
+    async loadBoats() {
+        if (this.boatsLoaded) return;
+
+        try {
+            const boats = await this._fetchNdjsonOrJson('boats', null);
+            this.allBoats = new Set(boats.map(boat => boat.name));
+            // Load selection from cookie, default to all selected
+            this.selectedBoats = this.loadBoatSelectionFromCookie();
+            if (this.selectedBoats.size === 0) {
+                this.selectedBoats = new Set(this.allBoats);
+                this.saveBoatSelectionToCookie();
+            }
+            this.boatsLoaded = true;
+            this.logger.debug('Boats loaded:', Array.from(this.allBoats));
+        } catch (e) {
+            this.logger.error('Failed to load boats:', e);
+            // Fallback: assume no boat filtering
+            this.allBoats = new Set();
+            this.selectedBoats = new Set();
+            this.boatsLoaded = true;
+        }
+    }
+
+    /**
+     * Get all available boats
+     */
+    getAllBoats() {
+        return Array.from(this.allBoats).sort();
+    }
+
+    /**
+     * Get currently selected boats
+     */
+    getSelectedBoats() {
+        return Array.from(this.selectedBoats);
+    }
+
+    /**
+     * Set boat selection
+     */
+    setBoatSelection(selectedBoats) {
+        this.selectedBoats = new Set(selectedBoats);
+        this.saveBoatSelectionToCookie();
+        // Re-filter all existing tracks
+        this._refilterAllTracks();
+    }
+
+    /**
+     * Load boat selection from cookie
+     */
+    loadBoatSelectionFromCookie() {
+        try {
+            const cookieValue = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('selectedBoats='));
+            if (cookieValue) {
+                const selected = JSON.parse(decodeURIComponent(cookieValue.split('=')[1]));
+                return new Set(selected);
+            }
+        } catch (e) {
+            this.logger.error('Failed to load boat selection from cookie:', e);
+        }
+        return new Set();
+    }
+
+    /**
+     * Save boat selection to cookie
+     */
+    saveBoatSelectionToCookie() {
+        try {
+            const selectedArray = Array.from(this.selectedBoats);
+            document.cookie = `selectedBoats=${encodeURIComponent(JSON.stringify(selectedArray))}; path=/; max-age=31536000`; // 1 year
+        } catch (e) {
+            this.logger.error('Failed to save boat selection to cookie:', e);
+        }
+    }
+
+    /**
+     * Filter tracks based on selected boats
+     */
+    _filterTracksByBoats(tracks) {
+        if (this.selectedBoats.size === 0 || this.allBoats.size === 0) {
+            return tracks; // No filtering if no boats loaded or none selected
+        }
+        return tracks.filter(track =>
+            // Always include the live track, regardless of boat selection
+            track.id === this.liveTrackId || (track.boatName && this.selectedBoats.has(track.boatName))
+        );
+    }
+
+    /**
+     * Re-filter all cached tracks and notify listeners
+     */
+    _refilterAllTracks() {
+        for (const [sectionId, jsonStr] of this.sectionTracks.entries()) {
+            try {
+                const allTracks = JSON.parse(jsonStr);
+                const filteredTracks = this._filterTracksByBoats(allTracks);
+                this.tracks.set(sectionId, filteredTracks);
+                this._safeNotify(this.tracksListeners, 'tracks refilter', sectionId, filteredTracks);
+            } catch (e) {
+                this.logger.error(`Failed to refilter tracks for section ${sectionId}:`, e);
+            }
+        }
     }
 
     /**
@@ -149,19 +266,43 @@ export default class TrackManager {
     }
 
     /**
-     * Register a listener for live track changes
-     * @param {Function} listener - Function(liveTrackId: string|null) called when live track changes
+     * Register a listener for boats changes
+     * @param {Function} listener - Function(boatsArray: Array) called when boats list changes
      * @returns {Function} Unregister function
      */
-    registerLiveTrackListener(listener) {
-        return this._registerAndCall(this.liveTrackListeners, () => this.liveTrackId, 'live track', listener);
+    registerBoatsListener(listener) {
+        this.boatsListeners.add(listener);
+        // Immediately call with current boats
+        try {
+            listener(Array.from(this.allBoats));
+        } catch (e) {
+            this.logger.error('boats listener immediate call failed', e);
+        }
+        return () => { this.boatsListeners.delete(listener); };
+    }
+
+    /**
+     * Helper method to check if two sets are equal
+     * @param {Set} setA
+     * @param {Set} setB
+     * @returns {boolean}
+     */
+    _setsEqual(setA, setB) {
+        if (setA.size !== setB.size) return false;
+        for (const item of setA) {
+            if (!setB.has(item)) return false;
+        }
+        return true;
     }
 
     /**
      * Start polling update.json and [year].json to detect when new tracks are added
      * and when track point counts increase for tracks with listeners.
      */
-    startPollingTracks() {
+    async startPollingTracks() {
+        // Load boats first
+        await this.loadBoats();
+
         if (this.tracksPollTimer) {
             clearInterval(this.tracksPollTimer);
             this.tracksPollTimer = null;
@@ -198,16 +339,17 @@ export default class TrackManager {
                             const tracksForYear = await this._fetchNdjsonOrJson(yearKey, 'tracks');
                             tracksForYear.sort((a, b) => (a.id < b.id ? 1 : -1));
                             if (tracksForYear.length > 0) {
-                                const nextJson = JSON.stringify(tracksForYear);
+                                const filteredTracks = this._filterTracksByBoats(tracksForYear);
+                                const nextJson = JSON.stringify(filteredTracks);
                                 const prevJson = this.sectionTracks.get(yearKey);
                                 if (!prevJson || prevJson !== nextJson) {
                                     this.sectionTracks.set(yearKey, nextJson);
-                                    this._safeNotify(this.tracksListeners, 'tracks', yearKey, tracksForYear);
+                                    this._safeNotify(this.tracksListeners, 'tracks', yearKey, filteredTracks);
                                 }
                                 // Update timestamp cache
                                 this.sectionTimestamps.set(yearKey, editedTs);
                                 // Ensure the per-section tracks Map is updated
-                                this.tracks.set(yearKey, tracksForYear);
+                                this.tracks.set(yearKey, filteredTracks);
                                 // continue to next key
                                 continue;
                             }
@@ -243,9 +385,10 @@ export default class TrackManager {
                         const prevJson = this.sectionTracks.get(yearKey);
                         if (prevJson) {
                             try {
-                                const tracksForYear = JSON.parse(prevJson);
-                                // Ensure per-section tracks Map contains the cached list
-                                this.tracks.set(yearKey, tracksForYear);
+                                const allTracks = JSON.parse(prevJson);
+                                const filteredTracks = this._filterTracksByBoats(allTracks);
+                                // Ensure per-section tracks Map contains the filtered cached list
+                                this.tracks.set(yearKey, filteredTracks);
                             } catch (e) {
                                 // ignore parse errors here
                             }
@@ -263,6 +406,49 @@ export default class TrackManager {
                     }
                 }
 
+                // Check for boats updates
+                if (updateData.boats) {
+                    const boatsEditedIso = updateData.boats.edited;
+                    let boatsEditedTs = null;
+                    if (boatsEditedIso) {
+                        try { boatsEditedTs = new Date(boatsEditedIso); } catch (e) { boatsEditedTs = null; }
+                    }
+
+                    if (boatsEditedTs && boatsEditedTs > this.boatsTimestamp) {
+                        // Boats file updated — reload it
+                        try {
+                            const boats = await this._fetchNdjsonOrJson('boats', null);
+                            const newBoatsSet = new Set(boats.map(boat => boat.name));
+
+                            // Check if boats list has changed
+                            const boatsChanged = !this._setsEqual(this.allBoats, newBoatsSet);
+
+                            if (boatsChanged) {
+                                this.allBoats = newBoatsSet;
+                                // Update selected boats to include any new boats
+                                const updatedSelectedBoats = new Set(this.selectedBoats);
+                                for (const boatName of this.allBoats) {
+                                    if (!this.selectedBoats.has(boatName)) {
+                                        updatedSelectedBoats.add(boatName);
+                                    }
+                                }
+                                this.selectedBoats = updatedSelectedBoats;
+                                this.saveBoatSelectionToCookie();
+
+                                // Notify that boats have changed (we'll need to add a listener for this)
+                                this._safeNotify(this.boatsListeners || new Set(), 'boats', Array.from(this.allBoats));
+
+                                this.logger.info('Boats list updated');
+                            }
+
+                            // Update timestamp cache
+                            this.boatsTimestamp = boatsEditedTs;
+                        } catch (e) {
+                            this.logger.error('Failed to reload boats:', e);
+                        }
+                    }
+                }
+
                 // Check for live track updates (if applicable)
                 const liveTrackId = updateData.live?.id || null;
                 if (liveTrackId !== this.liveTrackId) {
@@ -274,6 +460,8 @@ export default class TrackManager {
                     }
                     this.liveTrackId = liveTrackId;
                     this._safeNotify(this.liveTrackListeners, 'live track', this.liveTrackId);
+                    // Re-filter tracks since live track should always be included
+                    this._refilterAllTracks();
                 }
                 if (liveTrackId) {
                     const liveCount = updateData.live.pointCount || 0;

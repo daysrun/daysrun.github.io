@@ -110,7 +110,7 @@ async function initTrackManager() {
     trackManager = new TrackManager(dataUrl, pollInterval, logger);
 
     // Start polling tracks.json globally
-    trackManager.startPollingTracks();
+    await trackManager.startPollingTracks();
 }
 
 // Small helper to configure runtime (data URL, poll interval, logger)
@@ -281,6 +281,7 @@ initMap(settings).then(async (m) => {
             hasLiveTrack: trackManager.hasLiveTrack(),
             liveTrackId: trackManager.getLiveTrackId(),
             settings: settings,
+            trackManager: trackManager,
             onLiveTrackFollowChange: async (checked) => {
                 const liveTrackId = trackManager.getLiveTrackId();
                 if (!liveTrackId) return;
