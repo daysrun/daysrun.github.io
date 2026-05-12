@@ -205,7 +205,8 @@ export default class TrackManager {
         try {
             for (const [sectionId, jsonStr] of this.sectionTracks.entries()) {
                 try {
-                    const tracks = jsonStr ? JSON.parse(jsonStr) : null;
+                    const rawTracks = jsonStr ? JSON.parse(jsonStr) : null;
+                    const tracks = rawTracks ? this._filterTracksByBoats(rawTracks) : null;
                     console.log(`Immediate tracks listener call for section ${sectionId}:`, tracks);
                     if (tracks && tracks.length > 0) listener(sectionId, tracks);
                 } catch (e) {
@@ -304,7 +305,7 @@ export default class TrackManager {
                             tracksForYear.sort((a, b) => (a.id < b.id ? 1 : -1));
                             if (tracksForYear.length > 0) {
                                 const filteredTracks = this._filterTracksByBoats(tracksForYear);
-                                const nextJson = JSON.stringify(filteredTracks);
+                                const nextJson = JSON.stringify(tracksForYear);
                                 const prevJson = this.sectionTracks.get(yearKey);
                                 if (!prevJson || prevJson !== nextJson) {
                                     this.sectionTracks.set(yearKey, nextJson);
