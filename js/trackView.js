@@ -40,7 +40,7 @@ export default class TrackView {
         this.onBoundsChange = onBoundsChange;
         this.settings = settings;
         this.trackId = trackId;
-        this.meta = null; // cache for meta data
+        this.trackData = null; // cache for track data
         // If a NavDashboard instance was provided, ensure it's visible so TrackView
         // can update tiles immediately. The dashboard instance is expected to have
         // been initialized by the caller (main.js).
@@ -65,7 +65,7 @@ export default class TrackView {
         });
         this.track.setMap(this.map);
 
-        // Add click listener for meta popup
+        // Add click listener for track data popup
         this.track.addListener('click', (event) => {
             this.handleTrackClick(event);
         });
@@ -74,9 +74,9 @@ export default class TrackView {
     async handleTrackClick(event) {
         if (!this.trackId) return;
 
-        // Fetch meta if not already cached
-        if (this.meta === null) {
-            this.meta = await this.fetchMetaData();
+        // Fetch track data if not already cached
+        if (this.trackData === null) {
+            this.trackData = await this.fetchTrackData();
         }
 
         // Close any open info window
@@ -84,13 +84,13 @@ export default class TrackView {
             this.infoWindow.close();
         }
 
-        const boatName = this.meta ? this.meta.boatName || 'Unknown' : 'Unknown';
+        const boatName = this.trackData !== null ? this.trackData.boatName || 'Unknown' : 'Unknown';
         const dateStr = this.trackId ? `${this.trackId.slice(0,4)}-${this.trackId.slice(4,6)}-${this.trackId.slice(6,8)}` : 'N/A';
 
         const metaLines = [];
 
         // Track distance may be in meta or top-level Distance property; prefer top-level if available
-        const trackDistance = this.distance || this.meta.Distance || 0;
+        const trackDistance = this.distance || this.trackData.Distance || 0;
         const convertedDistance = UnitManager.convertValue('Distance', trackDistance, this._getTargetUnit('Distance'));
         metaLines.push(`<strong>Distance:</strong> ${convertedDistance.value}${convertedDistance.unitSpace}${convertedDistance.unit}`);
 
@@ -105,18 +105,18 @@ export default class TrackView {
             }
         }
 
-        if (this.meta) {
+        if (this.trackData && this.trackData.meta) {
             // Format meta data for display
             // Sample meta: {"maxSpeed":5.0}
-            if (this.meta.maxSpeed !== undefined) {
-                const converted = UnitManager.convertValue('SOG', this.meta.maxSpeed, this._getTargetUnit('SOG'));
+            if (this.trackData.meta.maxSpeed !== undefined) {
+                const converted = UnitManager.convertValue('SOG', this.trackData.meta.maxSpeed, this._getTargetUnit('SOG'));
                 metaLines.push(`<strong>Max Speed:</strong> ${converted.value}${converted.unitSpace}${converted.unit}`);
             }
 
             // Include any other meta fields that may be present
-            for (const key in this.meta) {
-                if (['maxSpeed', 'Distance', 'boatName', 'id', 'pointCount'].includes(key)) continue; // already handled or not to show
-                metaLines.push(`<strong>${key}:</strong> ${this.meta[key]}`);
+            for (const key in this.trackData.meta) {
+                if (['maxSpeed'].includes(key)) continue; // already handled or not to show
+                metaLines.push(`<strong>${key}:</strong> ${this.trackData.meta[key]}`);
             }
         }
 
@@ -135,7 +135,7 @@ export default class TrackView {
         this.infoWindow.open(this.map);
     }
 
-    async fetchMetaData() {
+    async fetchTrackData() {
         if (!this.trackId || this.trackId.length < 4) return null;
 
         const year = this.trackId.slice(0, 4);
