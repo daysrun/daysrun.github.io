@@ -228,7 +228,8 @@ export default class TrackView {
                 const ts = pointData.timestamp ? new Date(pointData.timestamp).toUTCString() : 'No timestamp';
                 const metadataLines = [];
                 for (const key in pointData) {
-                    if (key !== 'position' && key !== 'timestamp' && pointData[key] !== undefined) {
+                    if (!['position', 'marker', 'timestamp'].includes(key) && pointData[key] !== undefined) {
+                    // if (key !== 'position' && key !== 'timestamp' && pointData[key] !== undefined) {
                         const targetUnit = this._getTargetUnit(key);
                         const convertedValue = UnitManager.convertValue(key, pointData[key], targetUnit);
                         metadataLines.push(
@@ -273,7 +274,7 @@ export default class TrackView {
             this.track.setPath(this.trackPoints);
             this.distance = element.Distance;
             // If the point doesn't have SOG, skip placing a marker
-            if (element.SOG !== undefined) {
+            if (element.marker) {
                 this.markers.push(this.placeMarker(element, arrowSvg));
                 if (this.dashboard) {
                     this.dashboard.setWind(
