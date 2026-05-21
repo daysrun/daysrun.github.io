@@ -101,6 +101,7 @@ async function reinitializeMapForTheme(oldMap, settings) {
         colorScheme: colorScheme,
         disableDefaultUI: true,
         mapTypeId: 'terrain',
+        gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
     });
 
     return newMap;
