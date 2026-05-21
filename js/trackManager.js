@@ -377,6 +377,24 @@ export default class TrackManager {
                 // Check for live track updates (if applicable)
                 const liveTrackId = updateData.live?.id || null;
                 if (liveTrackId !== this.liveTrackId) {
+                    // If we're closing a live track, fetch its final points first
+                    if (this.liveTrackId && !liveTrackId) {
+                        // Find the closing track's final point count from cached track metadata
+                        let closingTrackCount = 0;
+                        for (const jsonStr of this.sectionTracks.values()) {
+                            try {
+                                const allTracks = JSON.parse(jsonStr);
+                                const closingTrack = allTracks.find(t => t.id === this.liveTrackId);
+                                if (closingTrack) {
+                                    closingTrackCount = closingTrack.pointCount || 0;
+                                    break;
+                                }
+                            } catch (e) {
+                                // ignore parse errors
+                            }
+                        }
+                        await this._refreshIfIncreased(this.liveTrackId, closingTrackCount);
+                    }
                     // Track identity changed; update metadata and notify listeners
                     if (liveTrackId) {
                         this.logger.info(`Live track updated to ${liveTrackId}`);
@@ -387,8 +405,7 @@ export default class TrackManager {
                     this._safeNotify(this.liveTrackListeners, 'live track', this.liveTrackId);
                     // Re-filter tracks since live track should always be included
                     this._refilterAllTracks();
-                }
-                if (liveTrackId) {
+                } else if (liveTrackId) {
                     const liveCount = updateData.live.pointCount || 0;
                     await this._refreshIfIncreased(liveTrackId, liveCount);
                 }
