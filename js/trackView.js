@@ -315,7 +315,7 @@ export default class TrackView {
     getMapForMarker(position) {
         const zoom = this.map.getZoom();
         const bounds = this.map.getBounds();
-        if (bounds.contains(position) && zoom >= 13) {
+        if (bounds.contains(position) && zoom >= 12) {
             return this.map;
         } else {
             return null;
