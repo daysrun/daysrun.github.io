@@ -69,6 +69,7 @@ async function initMap(settings = null) {
         colorScheme: colorScheme,
         disableDefaultUI: true,
         mapTypeId: 'terrain',
+        gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
     });
 }
 
