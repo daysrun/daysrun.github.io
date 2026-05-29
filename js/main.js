@@ -11,6 +11,7 @@ let map = null;
 let trackManager = null;
 let menu = null;
 const activeTrackViews = new Map(); // trackId -> { trackView, unregister }
+let initialTrackActivated = false;
 
 /**
  * Factory to create and register a TrackView for a specific track.
@@ -246,6 +247,7 @@ initMap(settings).then(async (m) => {
         const colour = explicitColour || getTrackColour(trackId);
         await createTrackView(trackId, colour, centerMap, dashboard, fitAllActiveTracks, settings);
         menu.setTrackSwatch(trackId, colour);
+        menu.setChecked(trackId, true);
         if (dashboard && typeof dashboard.hide === 'function') {
             // Register a listener for live track updates to hide the dashboard when deactivated
             trackManager.registerLiveTrackListener((liveTrackId) => {
@@ -263,6 +265,7 @@ initMap(settings).then(async (m) => {
         entry.trackView.destroy();
         activeTrackViews.delete(trackId);
         menu.removeTrackSwatch(trackId);
+        menu.setChecked(trackId, false);
         fitAllActiveTracks();
     };
     // Create the map menu UI and populate with tracks
@@ -334,4 +337,41 @@ initMap(settings).then(async (m) => {
     trackManager.registerLiveTrackListener((liveTrackId) => {
         menu.setLiveTrack(liveTrackId !== null, liveTrackId);
     });
+
+    const activateLatestFilteredTrack = async () => {
+        if (initialTrackActivated) return;
+        if (trackManager.hasLiveTrack()) return;
+        if (activeTrackViews.size > 0) return;
+
+        let latestTrack = null;
+        if (trackManager.tracks instanceof Map) {
+            for (const tracks of trackManager.tracks.values()) {
+                if (!Array.isArray(tracks)) continue;
+                for (const track of tracks) {
+                    if (!track || !track.id) continue;
+                    if (!latestTrack || track.id > latestTrack.id) {
+                        latestTrack = track;
+                    }
+                }
+            }
+        } else if (Array.isArray(trackManager.tracks)) {
+            for (const track of trackManager.tracks) {
+                if (!track || !track.id) continue;
+                if (!latestTrack || track.id > latestTrack.id) {
+                    latestTrack = track;
+                }
+            }
+        }
+
+        if (latestTrack && latestTrack.id) {
+            initialTrackActivated = true;
+            try {
+                await activateTrack(latestTrack.id, null, activeTrackViews.size === 0);
+            } catch (err) {
+                console.error('Error activating latest filtered track:', err);
+            }
+        }
+    };
+
+    activateLatestFilteredTrack();
 });

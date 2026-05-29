@@ -413,8 +413,8 @@ export default class TrackManager {
                 this.logger.error('Error polling track indices:', err);
             }
         };
-        // Initial poll immediately
-        poll();
+        // Initial poll immediately and wait for it to complete before returning
+        await poll();
         // Schedule periodic polls
         this.tracksPollTimer = setInterval(poll, this.pollInterval);
     }
