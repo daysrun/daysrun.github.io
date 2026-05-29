@@ -225,7 +225,6 @@ export default class TrackView {
             if (this.infoWindow.anchor === marker) {
                 this.infoWindow.close();
             } else {
-                const ts = pointData.timestamp ? new Date(pointData.timestamp).toUTCString() : 'No timestamp';
                 const metadataLines = [];
                 for (const key in pointData) {
                     if (!['position', 'marker', 'timestamp'].includes(key) && pointData[key] !== undefined) {
@@ -237,6 +236,24 @@ export default class TrackView {
                         );
                     }
                 }
+
+                function getTimestampFormatted(timestamp) {
+                    const date = new Date(timestamp);
+
+                    const options = {
+                        year: 'numeric',
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false, // Force 24-hour format
+                        timeZoneName: 'short' // Includes e.g., "EST"
+                    };
+
+                    const formatter = new Intl.DateTimeFormat('en-CA', options);
+                    return formatter.format(date).replace(',', '');
+                }
+                const ts = pointData.timestamp ? getTimestampFormatted(pointData.timestamp) : 'No timestamp';
 
                 // Get theme from settings to apply appropriate styles
                 const isDarkTheme = this.settings && this.settings.get('theme') === 'dark';
