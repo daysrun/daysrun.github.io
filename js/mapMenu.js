@@ -411,6 +411,24 @@ export default class MapMenu {
             }
         });
 
+        // Update section title with total distance if it's a Log section (identified by sectionId not being
+        // 'live-track' or 'boats' or 'settings')
+        this.sections.forEach((entry, sectionId) => {
+            if (['live-track', 'boats', 'settings'].includes(sectionId)) return;
+            const { section, list, title } = entry;
+            // Sum distances of all tracks in this section
+            let totalDistanceMeters = 0;
+            const inputs = list.querySelectorAll('input[data-track-distance]');
+            inputs.forEach(input => {
+                const dist = parseFloat(input.dataset.trackDistance);
+                if (!isNaN(dist)) totalDistanceMeters += dist;
+            });
+            const targetUnit = this.settings ? this.settings.get('distanceUnit') : 'nm';
+            const totalDistance = UnitManager.convertValue('Distance', totalDistanceMeters, targetUnit);
+            const newTitle = `${title} \u2014 ${totalDistance.value} ${totalDistance.unit}`;
+            section.header.querySelector('span:last-child').textContent = newTitle;
+        });
+
         // Update selected distance in footer
         // This will be automatically updated when tracks are reloaded
 
@@ -489,7 +507,12 @@ export default class MapMenu {
      * Returns the generated sectionId.
      */
     addSection(sectionId, tracks = []) {
-        const section = this._createSection(sectionId, sectionId);
+        // Get the total distance for the section by summing track distances
+        const totalDistanceMeters = tracks.reduce((sum, t) => sum + (t.Distance || 0), 0);
+        const targetUnit = this.settings ? this.settings.get('distanceUnit') : 'nm';
+        const totalDistance = UnitManager.convertValue('Distance', totalDistanceMeters, targetUnit);
+        const titleWithDistance = `${sectionId} \u2014 ${totalDistance.value} ${totalDistance.unit}`;
+        const section = this._createSection(titleWithDistance, sectionId);
         const list = document.createElement('div');
         list.className = 'map-menu-list';
         section.content.appendChild(list);
