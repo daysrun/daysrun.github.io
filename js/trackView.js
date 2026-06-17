@@ -277,8 +277,17 @@ export default class TrackView {
         if (!points || points.length === 0) return;
 
         if (points.length >= 1) {
-            this.startTime = points[0].timestamp ? new Date(points[0].timestamp) : null;
-            this.endTime = points[points.length - 1].timestamp ? new Date(points[points.length - 1].timestamp) : null;
+            const firstTs = points[0].timestamp ? new Date(points[0].timestamp) : null;
+            const lastTs = points[points.length - 1].timestamp ? new Date(points[points.length - 1].timestamp) : null;
+            // For live tracks processPoints is called repeatedly with deltas. Only
+            // set startTime if we don't have one yet (or if an earlier timestamp
+            // appears), and always advance endTime to the latest seen timestamp.
+            if (!this.startTime || (firstTs && firstTs < this.startTime)) {
+                this.startTime = firstTs;
+            }
+            if (!this.endTime || (lastTs && lastTs > this.endTime)) {
+                this.endTime = lastTs;
+            }
         }
 
         // Load arrow SVG once
