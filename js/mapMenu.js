@@ -649,6 +649,17 @@ export default class MapMenu {
             ]
         ));
 
+        // Show latest track on load setting; this should be a checkbox
+        content.appendChild(this._createCheckboxSettingGroup(
+            'Page Load Options',
+            'Auto-activate latest track',
+            'autoActivateLatestTrack',
+            [
+                { value: true, label: 'Yes' },
+                { value: false, label: 'No' }
+            ]
+        ));
+
         this.settingsSection.content.appendChild(content);
     }
 
@@ -785,6 +796,48 @@ export default class MapMenu {
             optionRow.appendChild(optionLabel);
             group.appendChild(optionRow);
         });
+
+        return group;
+    }
+
+    /**
+     * Create a setting group with a single checkbox.
+     * @param {string} label - Group label
+     * @param {string} settingName - Setting key
+     * @returns {HTMLElement}
+     */
+    _createCheckboxSettingGroup(grouplabel, settingLabel, settingName) {
+        const group = document.createElement('div');
+        group.className = 'map-menu-setting-group';
+
+        const groupLabel = document.createElement('div');
+        groupLabel.className = 'map-menu-setting-label';
+        groupLabel.textContent = grouplabel;
+        group.appendChild(groupLabel);
+
+        const currentValue = !!this.settings.get(settingName);
+
+        const row = document.createElement('div');
+        row.className = 'map-menu-setting-option';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = currentValue;
+        checkbox.className = 'map-menu-radio';
+        checkbox.addEventListener('change', (ev) => {
+            this.settings.set(settingName, !!ev.target.checked);
+        });
+
+        const optionLabel = document.createElement('label');
+        optionLabel.textContent = settingLabel;
+        optionLabel.className = 'map-menu-label';
+        optionLabel.addEventListener('click', () => checkbox.click());
+
+        // Single element order: checkbox followed by its label
+        row.appendChild(checkbox);
+        row.appendChild(optionLabel);
+        group.appendChild(row);
+
 
         return group;
     }

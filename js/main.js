@@ -373,5 +373,7 @@ initMap(settings).then(async (m) => {
         }
     };
 
-    activateLatestFilteredTrack();
+    if (settings.get('autoActivateLatestTrack')) {
+        activateLatestFilteredTrack();
+    }
 });

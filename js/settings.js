@@ -17,11 +17,12 @@ export default class Settings {
             speedUnit: 'knots',
             distanceUnit: 'nm',
             depthUnit: 'feet',
-            theme: 'light'
+            theme: 'light',
+            autoActivateLatestTrack: true
         };
 
         try {
-            const stored = localStorage.getItem('killick-settings');
+            const stored = localStorage.getItem('daysrun-settings');
             if (stored) {
                 const parsed = JSON.parse(stored);
                 return { ...defaultSettings, ...parsed };
@@ -38,7 +39,7 @@ export default class Settings {
      */
     saveSettings() {
         try {
-            localStorage.setItem('killick-settings', JSON.stringify(this.settings));
+            localStorage.setItem('daysrun-settings', JSON.stringify(this.settings));
         } catch (err) {
             console.error('Failed to save settings to localStorage:', err);
         }
