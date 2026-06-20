@@ -104,16 +104,6 @@ export default class MapMenu {
 
             // insert route section before boats section
             this.body.insertBefore(this.routeSection.container, this.boatsSection.container);
-
-            // Export GPX button placed in header (hidden until active)
-            this.exportButton = document.createElement('button');
-            this.exportButton.className = 'map-menu-export-gpx';
-            this.exportButton.textContent = 'Export GPX';
-            this.exportButton.style.display = 'none';
-            this.exportButton.addEventListener('click', () => {
-                if (this.routePlanner) this.routePlanner.exportGPX();
-            });
-            this.header.appendChild(this.exportButton);
         }
 
         // Sections map: sectionId -> { section, list, title }
@@ -281,9 +271,9 @@ export default class MapMenu {
             try {
                 this._lastRouteMeters = 0;
                 this.routePlanner = new RoutePlanner(this.map, {
+                    settings: this.settings,
                     onRouteChanged: (meters) => { this._lastRouteMeters = meters; this.setSelectedDistance(meters); }
                 });
-                this.exportButton.style.display = '';
                 // ensure selected distance shows zero initially
                 this.setSelectedDistance(0);
             } catch (err) {
@@ -295,7 +285,6 @@ export default class MapMenu {
                 try { this.routePlanner.destroy(); } catch (e) {}
                 this.routePlanner = null;
             }
-            this.exportButton.style.display = 'none';
             this.setSelectedDistance('');
         }
     }
@@ -505,6 +494,11 @@ export default class MapMenu {
             this.setSelectedDistance(this._lastRouteMeters);
         }
 
+        // Refresh route planner display (marker titles) if active
+        if (this.routePlanner && typeof this.routePlanner.refreshDisplay === 'function') {
+            try { this.routePlanner.refreshDisplay(); } catch (e) { /* ignore */ }
+        }
+
         // Notify main.js to reload all active tracks so markers show correct units
         try {
             this.onUnitsChanged();
@@ -536,10 +530,6 @@ export default class MapMenu {
             if (this.routePlanner) {
                 try { this.routePlanner.destroy(); } catch (e) {}
                 this.routePlanner = null;
-            }
-            // Remove export button if present
-            if (this.exportButton && this.exportButton.parentElement === this.header) {
-                this.header.removeChild(this.exportButton);
             }
         } catch (err) {
             // ignore
@@ -580,9 +570,9 @@ export default class MapMenu {
                 // create a fresh one for the new map
                 this._lastRouteMeters = 0;
                 this.routePlanner = new RoutePlanner(this.map, {
+                    settings: this.settings,
                     onRouteChanged: (meters) => { this._lastRouteMeters = meters; this.setSelectedDistance(meters); }
                 });
-                this.exportButton.style.display = '';
             } catch (err) {
                 console.error('Failed to re-create RoutePlanner on new map', err);
             }

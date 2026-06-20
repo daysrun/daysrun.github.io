@@ -1,3 +1,5 @@
+import UnitManager from './unitManager.js';
+
 // RoutePlanner: lightweight route planning helper for Google Maps
 export default class RoutePlanner {
     /**
@@ -7,6 +9,7 @@ export default class RoutePlanner {
     constructor(map, options = {}) {
         this.map = map;
         this.onRouteChanged = options.onRouteChanged || (() => {});
+        this.settings = options.settings || null;
         this.markers = [];
         this.polyline = new google.maps.Polyline({
             map: this.map,
@@ -91,6 +94,43 @@ export default class RoutePlanner {
         return marker;
     }
 
+    _createSymbol(color) {
+        return {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 6,
+            fillColor: color,
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 1
+        };
+    }
+
+    _setMarkerColor(marker, color) {
+        try {
+            marker.setIcon(this._createSymbol(color));
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    _updateMarkerIcons() {
+        const firstColor = '#00cc44'; // green
+        const lastColor = '#cc0000'; // red
+        const defaultColor = '#ff6600';
+        const n = this.markers.length;
+        for (let i = 0; i < n; i++) {
+            const m = this.markers[i];
+            if (!m) continue;
+            if (i === 0) {
+                this._setMarkerColor(m, firstColor);
+            } else if (i === n - 1) {
+                this._setMarkerColor(m, lastColor);
+            } else {
+                this._setMarkerColor(m, defaultColor);
+            }
+        }
+    }
+
     _openDeleteMenu(marker) {
         const content = document.createElement('div');
         const btn = document.createElement('button');
@@ -101,6 +141,15 @@ export default class RoutePlanner {
             this.infoWindow.close();
         });
         content.appendChild(btn);
+        // Export GPX option in waypoint menu
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = 'Export GPX';
+        exportBtn.style.cursor = 'pointer';
+        exportBtn.addEventListener('click', () => {
+            try { this.exportGPX(); } catch (e) { /* ignore */ }
+            this.infoWindow.close();
+        });
+        content.appendChild(exportBtn);
         this.infoWindow.setContent(content);
         this.infoWindow.open(this.map, marker);
     }
@@ -116,6 +165,14 @@ export default class RoutePlanner {
             this.infoWindow.close();
         });
         content.appendChild(btn);
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = 'Export GPX';
+        exportBtn.style.cursor = 'pointer';
+        exportBtn.addEventListener('click', () => {
+            try { this.exportGPX(); } catch (e) { /* ignore */ }
+            this.infoWindow.close();
+        });
+        content.appendChild(exportBtn);
         this.infoWindow.setContent(content);
         // position the infoWindow at the clicked location
         this.infoWindow.setPosition(latLng);
@@ -178,6 +235,28 @@ export default class RoutePlanner {
         return R * c;
     }
 
+    _formatDistance(meters) {
+        if (!isFinite(meters)) return '0 m';
+        if (this.settings && typeof this.settings.get === 'function') {
+            const targetUnit = this.settings.get('distanceUnit');
+            try {
+                const conv = UnitManager.convertValue('Distance', meters, targetUnit);
+                return `${conv.value} ${conv.unit}`;
+            } catch (e) {
+                // fallback to simple formatting
+            }
+        }
+        if (meters >= 1000) {
+            return `${(meters / 1000).toFixed(2)} km`;
+        }
+        return `${Math.round(meters)} m`;
+    }
+
+    // Public: refresh display (recompute titles/icons using current settings)
+    refreshDisplay() {
+        this._updateRoute();
+    }
+
     _updateRoute() {
         const path = this.markers.map(m => m.getPosition());
         this.polyline.setPath(path);
@@ -186,6 +265,25 @@ export default class RoutePlanner {
         for (let i = 1; i < path.length; i++) {
             total += this._computeDistanceMeters(path[i-1], path[i]);
         }
+
+        // update marker icons (first/last coloring)
+        try { this._updateMarkerIcons(); } catch (e) { /* ignore */ }
+
+        // update marker titles with cumulative distance from start
+        try {
+            let cum = 0;
+            for (let i = 0; i < path.length; i++) {
+                const m = this.markers[i];
+                if (!m) continue;
+                if (i === 0) {
+                    cum = 0;
+                } else {
+                    cum += this._computeDistanceMeters(path[i-1], path[i]);
+                }
+                const txt = this._formatDistance(cum);
+                try { m.setTitle(txt); } catch (e) {}
+            }
+        } catch (e) { /* ignore */ }
 
         try { this.onRouteChanged(total); } catch (e) { console.error('RoutePlanner onRouteChanged error', e); }
     }
