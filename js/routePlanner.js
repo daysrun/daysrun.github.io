@@ -133,23 +133,27 @@ export default class RoutePlanner {
 
     _openDeleteMenu(marker) {
         const content = document.createElement('div');
-        const btn = document.createElement('button');
-        btn.textContent = 'Delete waypoint';
-        btn.style.cursor = 'pointer';
-        btn.addEventListener('click', () => {
+        content.className = 'daysrun-menu';
+
+        const deleteItem = document.createElement('div');
+        deleteItem.className = 'daysrun-menu-item';
+        deleteItem.textContent = 'Delete waypoint';
+        deleteItem.addEventListener('click', () => {
             this.removeWaypoint(marker);
             this.infoWindow.close();
         });
-        content.appendChild(btn);
+        content.appendChild(deleteItem);
+
         // Export GPX option in waypoint menu
-        const exportBtn = document.createElement('button');
-        exportBtn.textContent = 'Export GPX';
-        exportBtn.style.cursor = 'pointer';
-        exportBtn.addEventListener('click', () => {
+        const exportItem = document.createElement('div');
+        exportItem.className = 'daysrun-menu-item';
+        exportItem.textContent = 'Export GPX';
+        exportItem.addEventListener('click', () => {
             try { this.exportGPX(); } catch (e) { /* ignore */ }
             this.infoWindow.close();
         });
-        content.appendChild(exportBtn);
+        content.appendChild(exportItem);
+
         this.infoWindow.setContent(content);
         this.infoWindow.open(this.map, marker);
     }
@@ -157,27 +161,32 @@ export default class RoutePlanner {
     _openInsertMenu(latLng) {
         // create a simple menu offering to insert a waypoint here
         const content = document.createElement('div');
-        const btn = document.createElement('button');
-        btn.textContent = 'Add waypoint here';
-        btn.style.cursor = 'pointer';
-        btn.addEventListener('click', () => {
+        content.className = 'daysrun-menu';
+
+        const insertItem = document.createElement('div');
+        insertItem.className = 'daysrun-menu-item';
+        insertItem.textContent = 'Add waypoint here';
+        insertItem.addEventListener('click', () => {
             this._insertWaypointAtLocation(latLng);
             this.infoWindow.close();
         });
-        content.appendChild(btn);
-        const exportBtn = document.createElement('button');
-        exportBtn.textContent = 'Export GPX';
-        exportBtn.style.cursor = 'pointer';
-        exportBtn.addEventListener('click', () => {
+        content.appendChild(insertItem);
+
+        const exportItem = document.createElement('div');
+        exportItem.className = 'daysrun-menu-item';
+        exportItem.textContent = 'Export GPX';
+        exportItem.addEventListener('click', () => {
             try { this.exportGPX(); } catch (e) { /* ignore */ }
             this.infoWindow.close();
         });
-        content.appendChild(exportBtn);
+        content.appendChild(exportItem);
+
         this.infoWindow.setContent(content);
         // position the infoWindow at the clicked location
         this.infoWindow.setPosition(latLng);
         this.infoWindow.open(this.map);
     }
+
 
     _insertWaypointAtLocation(latLng) {
         if (this.markers.length < 2) {
