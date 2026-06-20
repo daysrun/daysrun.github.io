@@ -1,4 +1,5 @@
 import UnitManager from './unitManager.js';
+import RoutePlanner from './routePlanner.js';
 
 // MapMenu: overlay control with two collapsible sections - Live Track and Log
 export default class MapMenu {
@@ -77,6 +78,43 @@ export default class MapMenu {
         this.boatsSection = this._createSection('Boat Filter', 'boats');
         this._populateBoatsSection();
         this.body.appendChild(this.boatsSection.container);
+
+        // Route Planning section (toggle)
+        this.routePlanner = null;
+        this.allowRoutePlanning = options.allowRoutePlanning !== false; // default true
+        if (this.allowRoutePlanning) {
+            this.routeSection = this._createSection('Route Planning', 'route-planning');
+            const rpRow = document.createElement('div');
+            rpRow.className = 'map-menu-row';
+            this.routeToggle = document.createElement('input');
+            this.routeToggle.type = 'checkbox';
+            this.routeToggle.className = 'map-menu-checkbox';
+            this.routeToggle.id = 'menu-route-toggle';
+            const rpLabel = document.createElement('label');
+            rpLabel.textContent = 'Enable route planning';
+            rpLabel.className = 'map-menu-label';
+            rpLabel.addEventListener('click', () => this.routeToggle.click());
+            this.routeToggle.addEventListener('change', (ev) => this._toggleRoutePlanning(ev.target.checked));
+            rpRow.appendChild(this.routeToggle);
+            rpRow.appendChild(rpLabel);
+            const rpContent = document.createElement('div');
+            rpContent.className = 'map-menu-list';
+            rpContent.appendChild(rpRow);
+            this.routeSection.content.appendChild(rpContent);
+
+            // insert route section before boats section
+            this.body.insertBefore(this.routeSection.container, this.boatsSection.container);
+
+            // Export GPX button placed in header (hidden until active)
+            this.exportButton = document.createElement('button');
+            this.exportButton.className = 'map-menu-export-gpx';
+            this.exportButton.textContent = 'Export GPX';
+            this.exportButton.style.display = 'none';
+            this.exportButton.addEventListener('click', () => {
+                if (this.routePlanner) this.routePlanner.exportGPX();
+            });
+            this.header.appendChild(this.exportButton);
+        }
 
         // Sections map: sectionId -> { section, list, title }
         // Sections (including any 'Log'-like groups) must be added explicitly via addSection()
@@ -229,6 +267,36 @@ export default class MapMenu {
                     this._toggleSection(entry.section);
                 }
             }
+        }
+    }
+
+    /**
+     * Toggle Route Planning mode on/off
+     * @param {boolean} enabled
+     */
+    _toggleRoutePlanning(enabled) {
+        if (!this.allowRoutePlanning) return;
+        if (enabled) {
+            if (this.routePlanner) return;
+            try {
+                this._lastRouteMeters = 0;
+                this.routePlanner = new RoutePlanner(this.map, {
+                    onRouteChanged: (meters) => { this._lastRouteMeters = meters; this.setSelectedDistance(meters); }
+                });
+                this.exportButton.style.display = '';
+                // ensure selected distance shows zero initially
+                this.setSelectedDistance(0);
+            } catch (err) {
+                console.error('Failed to start RoutePlanner', err);
+                this.routeToggle.checked = false;
+            }
+        } else {
+            if (this.routePlanner) {
+                try { this.routePlanner.destroy(); } catch (e) {}
+                this.routePlanner = null;
+            }
+            this.exportButton.style.display = 'none';
+            this.setSelectedDistance('');
         }
     }
 
@@ -432,6 +500,11 @@ export default class MapMenu {
         // Update selected distance in footer
         // This will be automatically updated when tracks are reloaded
 
+        // If a route is active, re-render its distance using the new units
+        if (this._lastRouteMeters !== undefined && this._lastRouteMeters !== null) {
+            this.setSelectedDistance(this._lastRouteMeters);
+        }
+
         // Notify main.js to reload all active tracks so markers show correct units
         try {
             this.onUnitsChanged();
@@ -458,6 +531,15 @@ export default class MapMenu {
                 this.settings.removeListener('speedUnit', () => this._handleUnitsChanged());
                 this.settings.removeListener('depthUnit', () => this._handleUnitsChanged());
                 this.settings.removeListener('distanceUnit', () => this._handleUnitsChanged());
+            }
+            // Destroy route planner if present
+            if (this.routePlanner) {
+                try { this.routePlanner.destroy(); } catch (e) {}
+                this.routePlanner = null;
+            }
+            // Remove export button if present
+            if (this.exportButton && this.exportButton.parentElement === this.header) {
+                this.header.removeChild(this.exportButton);
             }
         } catch (err) {
             // ignore
@@ -489,6 +571,22 @@ export default class MapMenu {
         // Update to new map and re-attach
         this.map = newMap;
         this.map.controls[google.maps.ControlPosition.TOP_LEFT].push(this.container);
+
+        // If route planner was active, re-create it bound to new map
+        if (this.allowRoutePlanning && this.routeToggle && this.routeToggle.checked) {
+            try {
+                // destroy any existing planner
+                if (this.routePlanner) { this.routePlanner.destroy(); this.routePlanner = null; }
+                // create a fresh one for the new map
+                this._lastRouteMeters = 0;
+                this.routePlanner = new RoutePlanner(this.map, {
+                    onRouteChanged: (meters) => { this._lastRouteMeters = meters; this.setSelectedDistance(meters); }
+                });
+                this.exportButton.style.display = '';
+            } catch (err) {
+                console.error('Failed to re-create RoutePlanner on new map', err);
+            }
+        }
     }
 
     static beautifyTrackId(trackId) {
