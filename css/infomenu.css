@@ -1,0 +1,49 @@
+.daysrun-menu {
+  min-width: 160px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #111;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  padding: 4px 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+.daysrun-menu-item {
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.daysrun-menu-item.daysrun-menu-info {
+  cursor: default;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.daysrun-menu-item.daysrun-menu-info:hover {
+  background: transparent;
+}
+
+.daysrun-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+
+.daysrun-menu-item:active {
+  background: rgba(0, 0, 0, 0.10);
+}
+
+body.dark-theme .daysrun-menu {
+  background: rgba(40, 40, 40, 0.98);
+  color: #eaeaea;
+  border-color: rgba(255,255,255,0.15);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.55);
+}
+
+body.dark-theme .daysrun-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
