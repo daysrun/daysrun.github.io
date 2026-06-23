@@ -17,9 +17,20 @@
   white-space: nowrap;
 }
 
+.daysrun-menu-item.daysrun-menu-info {
+  cursor: default;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.daysrun-menu-item.daysrun-menu-info:hover {
+  background: transparent;
+}
+
 .daysrun-menu-item:hover {
   background: rgba(0, 0, 0, 0.06);
 }
+
 
 .daysrun-menu-item:active {
   background: rgba(0, 0, 0, 0.10);

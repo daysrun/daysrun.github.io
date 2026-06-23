@@ -79,34 +79,8 @@ export default class MapMenu {
         this._populateBoatsSection();
         this.body.appendChild(this.boatsSection.container);
 
-        // Route Planning section (toggle)
-        this.routePlanner = null;
-        this.allowRoutePlanning = options.allowRoutePlanning !== false; // default true
-        if (this.allowRoutePlanning) {
-            this.routeSection = this._createSection('Route Planning', 'route-planning');
-            const rpRow = document.createElement('div');
-            rpRow.className = 'map-menu-row';
-            this.routeToggle = document.createElement('input');
-            this.routeToggle.type = 'checkbox';
-            this.routeToggle.className = 'map-menu-checkbox';
-            this.routeToggle.id = 'menu-route-toggle';
-            const rpLabel = document.createElement('label');
-            rpLabel.textContent = 'Enable route planning';
-            rpLabel.className = 'map-menu-label';
-            rpLabel.addEventListener('click', () => this.routeToggle.click());
-            this.routeToggle.addEventListener('change', (ev) => this._toggleRoutePlanning(ev.target.checked));
-            rpRow.appendChild(this.routeToggle);
-            rpRow.appendChild(rpLabel);
-            const rpContent = document.createElement('div');
-            rpContent.className = 'map-menu-list';
-            rpContent.appendChild(rpRow);
-            this.routeSection.content.appendChild(rpContent);
-
-            // insert route section before boats section
-            this.body.insertBefore(this.routeSection.container, this.boatsSection.container);
-        }
-
         // Sections map: sectionId -> { section, list, title }
+
         // Sections (including any 'Log'-like groups) must be added explicitly via addSection()
         this.sections = new Map();
 
@@ -116,6 +90,28 @@ export default class MapMenu {
             this._populateSettingsSection();
             this.body.appendChild(this.settingsSection.container);
         }
+
+        // Route Planning section (toggle)
+        this.routePlanner = null;
+        this.routeSection = this._createSection('Route Planning', 'route-planning');
+        const rpRow = document.createElement('div');
+        rpRow.className = 'map-menu-row';
+        this.routeToggle = document.createElement('input');
+        this.routeToggle.type = 'checkbox';
+        this.routeToggle.className = 'map-menu-checkbox';
+        this.routeToggle.id = 'menu-route-toggle';
+        const rpLabel = document.createElement('label');
+        rpLabel.textContent = 'Enable route planning';
+        rpLabel.className = 'map-menu-label';
+        rpLabel.addEventListener('click', () => this.routeToggle.click());
+        this.routeToggle.addEventListener('change', (ev) => this._toggleRoutePlanning(ev.target.checked));
+        rpRow.appendChild(this.routeToggle);
+        rpRow.appendChild(rpLabel);
+        const rpContent = document.createElement('div');
+        rpContent.className = 'map-menu-list';
+        rpContent.appendChild(rpRow);
+        this.routeSection.content.appendChild(rpContent);
+        this.body.appendChild(this.routeSection.container);
 
         // Toggle main body visibility when header clicked
         this.header.addEventListener('click', () => {
@@ -265,17 +261,19 @@ export default class MapMenu {
      * @param {boolean} enabled
      */
     _toggleRoutePlanning(enabled) {
-        if (!this.allowRoutePlanning) return;
         if (enabled) {
             if (this.routePlanner) return;
             try {
                 this._lastRouteMeters = 0;
                 this.routePlanner = new RoutePlanner(this.map, {
                     settings: this.settings,
-                    onRouteChanged: (meters) => { this._lastRouteMeters = meters; this.setSelectedDistance(meters); }
+                    // Route distance is displayed in the route context menu itself.
+                    // Do not update MapMenu's footer "Selected distance" from route changes.
+                    onRouteChanged: (meters) => { this._lastRouteMeters = meters; }
                 });
-                // ensure selected distance shows zero initially
-                this.setSelectedDistance(0);
+                // Keep footer untouched when route planning starts.
+                this.setSelectedDistance('');
+
             } catch (err) {
                 console.error('Failed to start RoutePlanner', err);
                 this.routeToggle.checked = false;
@@ -489,10 +487,9 @@ export default class MapMenu {
         // Update selected distance in footer
         // This will be automatically updated when tracks are reloaded
 
-        // If a route is active, re-render its distance using the new units
-        if (this._lastRouteMeters !== undefined && this._lastRouteMeters !== null) {
-            this.setSelectedDistance(this._lastRouteMeters);
-        }
+        // Route distance is displayed in the route context menu itself.
+        // Do not update MapMenu footer selected distance from route changes.
+
 
         // Refresh route planner display (marker titles) if active
         if (this.routePlanner && typeof this.routePlanner.refreshDisplay === 'function') {
@@ -563,7 +560,7 @@ export default class MapMenu {
         this.map.controls[google.maps.ControlPosition.TOP_LEFT].push(this.container);
 
         // If route planner was active, re-create it bound to new map
-        if (this.allowRoutePlanning && this.routeToggle && this.routeToggle.checked) {
+        if (this.routeToggle && this.routeToggle.checked) {
             try {
                 // destroy any existing planner
                 if (this.routePlanner) { this.routePlanner.destroy(); this.routePlanner = null; }

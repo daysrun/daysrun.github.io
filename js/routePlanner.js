@@ -131,62 +131,61 @@ export default class RoutePlanner {
         }
     }
 
-    _openDeleteMenu(marker) {
+    _createMenuBase() {
         const content = document.createElement('div');
         content.className = 'daysrun-menu';
 
-        const deleteItem = document.createElement('div');
-        deleteItem.className = 'daysrun-menu-item';
-        deleteItem.textContent = 'Delete waypoint';
-        deleteItem.addEventListener('click', () => {
+        const distanceInfo = document.createElement('div');
+        distanceInfo.className = 'daysrun-menu-item daysrun-menu-info';
+        distanceInfo.textContent = `Route distance: ${this._formatDistance(this._getCurrentRouteMeters())}`;
+        content.appendChild(distanceInfo);
+
+        return content;
+    }
+
+    _createMenuItem(text, onClick) {
+        const item = document.createElement('div');
+        item.className = 'daysrun-menu-item';
+        item.textContent = text;
+        item.addEventListener('click', onClick);
+        return item;
+    }
+
+    _openDeleteMenu(marker) {
+        const content = this._createMenuBase();
+
+        content.appendChild(this._createMenuItem('Delete waypoint', () => {
             this.removeWaypoint(marker);
             this.infoWindow.close();
-        });
-        content.appendChild(deleteItem);
+        }));
 
-        // Export GPX option in waypoint menu
-        const exportItem = document.createElement('div');
-        exportItem.className = 'daysrun-menu-item';
-        exportItem.textContent = 'Export GPX';
-        exportItem.addEventListener('click', () => {
+        content.appendChild(this._createMenuItem('Export GPX', () => {
             try { this.exportGPX(); } catch (e) { /* ignore */ }
             this.infoWindow.close();
-        });
-        content.appendChild(exportItem);
+        }));
 
         this.infoWindow.setContent(content);
         this.infoWindow.open(this.map, marker);
     }
 
     _openInsertMenu(latLng) {
-        // create a simple menu offering to insert a waypoint here
-        const content = document.createElement('div');
-        content.className = 'daysrun-menu';
+        const content = this._createMenuBase();
 
-        const insertItem = document.createElement('div');
-        insertItem.className = 'daysrun-menu-item';
-        insertItem.textContent = 'Add waypoint here';
-        insertItem.addEventListener('click', () => {
+        content.appendChild(this._createMenuItem('Add waypoint here', () => {
             this._insertWaypointAtLocation(latLng);
             this.infoWindow.close();
-        });
-        content.appendChild(insertItem);
+        }));
 
-        const exportItem = document.createElement('div');
-        exportItem.className = 'daysrun-menu-item';
-        exportItem.textContent = 'Export GPX';
-        exportItem.addEventListener('click', () => {
+        content.appendChild(this._createMenuItem('Export GPX', () => {
             try { this.exportGPX(); } catch (e) { /* ignore */ }
             this.infoWindow.close();
-        });
-        content.appendChild(exportItem);
+        }));
 
         this.infoWindow.setContent(content);
         // position the infoWindow at the clicked location
         this.infoWindow.setPosition(latLng);
         this.infoWindow.open(this.map);
     }
-
 
     _insertWaypointAtLocation(latLng) {
         if (this.markers.length < 2) {
@@ -244,6 +243,15 @@ export default class RoutePlanner {
         return R * c;
     }
 
+    _getCurrentRouteMeters() {
+        const path = this.markers.map(m => m.getPosition());
+        let total = 0;
+        for (let i = 1; i < path.length; i++) {
+            total += this._computeDistanceMeters(path[i-1], path[i]);
+        }
+        return total;
+    }
+
     _formatDistance(meters) {
         if (!isFinite(meters)) return '0 m';
         if (this.settings && typeof this.settings.get === 'function') {
@@ -261,10 +269,12 @@ export default class RoutePlanner {
         return `${Math.round(meters)} m`;
     }
 
+
     // Public: refresh display (recompute titles/icons using current settings)
     refreshDisplay() {
         this._updateRoute();
     }
+
 
     _updateRoute() {
         const path = this.markers.map(m => m.getPosition());
