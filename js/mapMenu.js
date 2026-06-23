@@ -267,11 +267,8 @@ export default class MapMenu {
                 this._lastRouteMeters = 0;
                 this.routePlanner = new RoutePlanner(this.map, {
                     settings: this.settings,
-                    // Route distance is displayed in the route context menu itself.
-                    // Do not update MapMenu's footer "Selected distance" from route changes.
                     onRouteChanged: (meters) => { this._lastRouteMeters = meters; }
                 });
-                // Keep footer untouched when route planning starts.
                 this.setSelectedDistance('');
 
             } catch (err) {
@@ -483,13 +480,6 @@ export default class MapMenu {
             const newTitle = `${title} \u2014 ${totalDistance.value} ${totalDistance.unit}`;
             section.header.querySelector('span:last-child').textContent = newTitle;
         });
-
-        // Update selected distance in footer
-        // This will be automatically updated when tracks are reloaded
-
-        // Route distance is displayed in the route context menu itself.
-        // Do not update MapMenu footer selected distance from route changes.
-
 
         // Refresh route planner display (marker titles) if active
         if (this.routePlanner && typeof this.routePlanner.refreshDisplay === 'function') {
