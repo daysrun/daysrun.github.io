@@ -81,11 +81,6 @@ async function initMap(settings = null) {
         disableDefaultUI: true,
         mapTypeId: mapType,
         gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
-        mapTypeControl: true,
-        mapTypeControlOptions: {
-            style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
-            position: google.maps.ControlPosition.TOP_RIGHT
-        }
     });
 
     // Explicitly apply map type after creation to ensure persisted setting is respected.
@@ -121,11 +116,6 @@ async function reinitializeMapForTheme(oldMap, settings) {
         disableDefaultUI: true,
         mapTypeId: mapType,
         gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
-        mapTypeControl: true,
-        mapTypeControlOptions: {
-            style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
-            position: google.maps.ControlPosition.TOP_RIGHT
-        }
     });
 
     // Keep map type consistent when rebuilding the map for theme changes.
