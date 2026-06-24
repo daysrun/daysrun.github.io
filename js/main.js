@@ -71,6 +71,11 @@ async function initMap(settings = null) {
         disableDefaultUI: true,
         mapTypeId: 'terrain',
         gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+            style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+            position: google.maps.ControlPosition.TOP_RIGHT
+        }
     });
 }
 
@@ -88,9 +93,8 @@ async function reinitializeMapForTheme(oldMap, settings) {
     // Preserve the current state
     const zoom = oldMap.getZoom();
     const center = oldMap.getCenter();
-    const bounds = oldMap.getBounds();
+    const options = oldMap.getOptions();
 
-    // const { ColorScheme } = await google.maps.importLibrary("core");
     const theme = settings.get('theme');
     const colorScheme = theme === 'dark' ? google.maps.ColorScheme.DARK : google.maps.ColorScheme.LIGHT;
 
@@ -103,6 +107,8 @@ async function reinitializeMapForTheme(oldMap, settings) {
         disableDefaultUI: true,
         mapTypeId: 'terrain',
         gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
+        mapTypeControl: true,
+        mapTypeControlOptions: options
     });
 
     return newMap;
