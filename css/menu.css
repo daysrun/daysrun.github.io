@@ -286,6 +286,28 @@
     font-weight: normal;
 }
 
+.map-menu-select {
+    font-size: 12px;
+    line-height: 1.3;
+    padding: 4px 8px;
+    border: 1px solid rgba(0,0,0,0.25);
+    border-radius: 4px;
+    background: #ffffff;
+    color: #1f2933;
+    cursor: pointer;
+    appearance: auto;
+    color-scheme: light;
+}
+
+.map-menu-select:hover {
+    border-color: rgba(0,0,0,0.4);
+}
+
+.map-menu-select:focus {
+    outline: 2px solid rgba(26, 115, 232, 0.35);
+    outline-offset: 1px;
+}
+
 /* Dark theme for menu */
 body.dark-theme .map-menu-container {
     background: rgba(40, 40, 40, 0.95);
@@ -330,4 +352,19 @@ body.dark-theme .map-menu-footer-value {
 
 body.dark-theme .map-menu-setting-label {
     color: #e0e0e0;
+}
+
+body.dark-theme .map-menu-select {
+    border-color: rgba(255,255,255,0.22);
+    background: #2d2d2d;
+    color: #e8e8e8;
+    color-scheme: dark;
+}
+
+body.dark-theme .map-menu-select:hover {
+    border-color: rgba(255,255,255,0.4);
+}
+
+body.dark-theme .map-menu-select:focus {
+    outline: 2px solid rgba(144, 202, 249, 0.5);
 }
