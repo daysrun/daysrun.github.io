@@ -18,7 +18,8 @@ export default class Settings {
             distanceUnit: 'nm',
             depthUnit: 'feet',
             theme: 'light',
-            autoActivateLatestTrack: true
+            autoActivateLatestTrack: true,
+            mapType: 'terrain'
         };
 
         try {

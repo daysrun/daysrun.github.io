@@ -724,16 +724,61 @@ export default class MapMenu {
             ]
         ));
 
-        // Show latest track on load setting; this should be a checkbox
-        content.appendChild(this._createCheckboxSettingGroup(
-            'Page Load Options',
-            'Auto-activate latest track',
-            'autoActivateLatestTrack',
-            [
-                { value: true, label: 'Yes' },
-                { value: false, label: 'No' }
-            ]
-        ));
+        // Page Load Options group containing both auto-activate and map type settings
+        const pageLoadGroup = document.createElement('div');
+        pageLoadGroup.className = 'map-menu-setting-group';
+        const pageLoadLabel = document.createElement('div');
+        pageLoadLabel.className = 'map-menu-setting-label';
+        pageLoadLabel.textContent = 'Page Load Options';
+        pageLoadGroup.appendChild(pageLoadLabel);
+
+        // Auto-activate latest track checkbox
+        const autoActivateRow = document.createElement('div');
+        autoActivateRow.className = 'map-menu-setting-option';
+        const autoActivateCheckbox = document.createElement('input');
+        autoActivateCheckbox.type = 'checkbox';
+        autoActivateCheckbox.checked = !!this.settings.get('autoActivateLatestTrack');
+        autoActivateCheckbox.className = 'map-menu-radio';
+        autoActivateCheckbox.addEventListener('change', (ev) => {
+            this.settings.set('autoActivateLatestTrack', !!ev.target.checked);
+        });
+        const autoActivateLabel = document.createElement('label');
+        autoActivateLabel.textContent = 'Auto-activate latest track';
+        autoActivateLabel.className = 'map-menu-label';
+        autoActivateLabel.addEventListener('click', () => autoActivateCheckbox.click());
+        autoActivateRow.appendChild(autoActivateCheckbox);
+        autoActivateRow.appendChild(autoActivateLabel);
+        pageLoadGroup.appendChild(autoActivateRow);
+
+        // Map Type dropdown
+        const mapTypeRow = document.createElement('div');
+        mapTypeRow.className = 'map-menu-setting-option';
+        const mapTypeLabel = document.createElement('label');
+        mapTypeLabel.textContent = 'Map Type';
+        mapTypeLabel.className = 'map-menu-label';
+        const mapTypeSelect = document.createElement('select');
+        mapTypeSelect.className = 'map-menu-select';
+        mapTypeSelect.addEventListener('change', (ev) => {
+            this.settings.set('mapType', ev.target.value);
+        });
+        const mapTypeOptions = [
+            { value: 'roadmap', label: 'Roadmap' },
+            { value: 'satellite', label: 'Satellite' },
+            { value: 'hybrid', label: 'Hybrid' },
+            { value: 'terrain', label: 'Terrain' }
+        ];
+        mapTypeOptions.forEach(option => {
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = option.label;
+            mapTypeSelect.appendChild(optionElement);
+        });
+        mapTypeSelect.value = this.settings.get('mapType') || 'terrain';
+        mapTypeRow.appendChild(mapTypeLabel);
+        mapTypeRow.appendChild(mapTypeSelect);
+        pageLoadGroup.appendChild(mapTypeRow);
+
+        content.appendChild(pageLoadGroup);
 
         this.settingsSection.content.appendChild(content);
     }

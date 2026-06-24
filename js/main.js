@@ -13,6 +13,15 @@ let menu = null;
 const activeTrackViews = new Map(); // trackId -> { trackView, unregister }
 let initialTrackActivated = false;
 
+function getConfiguredMapType(settings = null) {
+    const fallback = 'terrain';
+    if (!settings) return fallback;
+
+    const mapType = settings.get('mapType');
+    const validTypes = new Set(['roadmap', 'satellite', 'hybrid', 'terrain']);
+    return validTypes.has(mapType) ? mapType : fallback;
+}
+
 /**
  * Factory to create and register a TrackView for a specific track.
  * @param {string} trackId - ID of the track to display
@@ -63,13 +72,14 @@ async function initMap(settings = null) {
     }
 
     // The map, centered at position
-    return new google.maps.Map(document.getElementById("map"), {
+    const mapType = getConfiguredMapType(settings);
+    const mapInstance = new google.maps.Map(document.getElementById("map"), {
         zoom: 12,
         center: position,
         mapId: "d79157190202fad31292f2ce",
         colorScheme: colorScheme,
         disableDefaultUI: true,
-        mapTypeId: 'terrain',
+        mapTypeId: mapType,
         gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
         mapTypeControl: true,
         mapTypeControlOptions: {
@@ -77,6 +87,10 @@ async function initMap(settings = null) {
             position: google.maps.ControlPosition.TOP_RIGHT
         }
     });
+
+    // Explicitly apply map type after creation to ensure persisted setting is respected.
+    mapInstance.setMapTypeId(mapType);
+    return mapInstance;
 }
 
 /**
@@ -93,10 +107,10 @@ async function reinitializeMapForTheme(oldMap, settings) {
     // Preserve the current state
     const zoom = oldMap.getZoom();
     const center = oldMap.getCenter();
-    const options = oldMap.getOptions();
 
     const theme = settings.get('theme');
     const colorScheme = theme === 'dark' ? google.maps.ColorScheme.DARK : google.maps.ColorScheme.LIGHT;
+    const mapType = getConfiguredMapType(settings);
 
     // Create new map with new color scheme
     const newMap = new google.maps.Map(document.getElementById("map"), {
@@ -105,11 +119,17 @@ async function reinitializeMapForTheme(oldMap, settings) {
         mapId: "d79157190202fad31292f2ce",
         colorScheme: colorScheme,
         disableDefaultUI: true,
-        mapTypeId: 'terrain',
+        mapTypeId: mapType,
         gestureHandling: 'greedy', // allow scrolling on map without ctrl/meta key or double-tap on mobile
         mapTypeControl: true,
-        mapTypeControlOptions: options
+        mapTypeControlOptions: {
+            style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+            position: google.maps.ControlPosition.TOP_RIGHT
+        }
     });
+
+    // Keep map type consistent when rebuilding the map for theme changes.
+    newMap.setMapTypeId(mapType);
 
     return newMap;
 }
@@ -154,6 +174,13 @@ initMap(settings).then(async (m) => {
                 entry.trackView.infoWindow.close();
             }
         });
+    });
+
+    // Register listener to update map type when settings change
+    settings.addListener('mapType', () => {
+        if (map) {
+            map.setMapTypeId(getConfiguredMapType(settings));
+        }
     });
 
     // Register listener to update map theme when settings change
