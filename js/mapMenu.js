@@ -550,14 +550,21 @@ export default class MapMenu {
         // If route planner was active, re-create it bound to new map
         if (this.routeToggle && this.routeToggle.checked) {
             try {
+                const waypointPositions = this.routePlanner && typeof this.routePlanner.getWaypoints === 'function'
+                    ? this.routePlanner.getWaypoints()
+                    : [];
+
                 // destroy any existing planner
                 if (this.routePlanner) { this.routePlanner.destroy(); this.routePlanner = null; }
                 // create a fresh one for the new map
                 this._lastRouteMeters = 0;
                 this.routePlanner = new RoutePlanner(this.map, {
                     settings: this.settings,
-                    onRouteChanged: (meters) => { this._lastRouteMeters = meters; this.setSelectedDistance(meters); }
+                    onRouteChanged: (meters) => { this._lastRouteMeters = meters; }
                 });
+
+                // Restore waypoints so the route is redrawn on theme/map reinitialize.
+                this.routePlanner.restoreWaypoints(waypointPositions);
             } catch (err) {
                 console.error('Failed to re-create RoutePlanner on new map', err);
             }

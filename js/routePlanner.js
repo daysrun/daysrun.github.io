@@ -275,6 +275,27 @@ export default class RoutePlanner {
         this._updateRoute();
     }
 
+    // Public: snapshot current waypoints as plain coordinates.
+    getWaypoints() {
+        return this.markers
+            .map((marker) => {
+                if (!marker || typeof marker.getPosition !== 'function') return null;
+                const pos = marker.getPosition();
+                if (!pos || typeof pos.lat !== 'function' || typeof pos.lng !== 'function') return null;
+                return { lat: pos.lat(), lng: pos.lng() };
+            })
+            .filter((point) => point !== null);
+    }
+
+    // Public: rebuild route waypoints from plain coordinates.
+    restoreWaypoints(points = []) {
+        if (!Array.isArray(points) || points.length === 0) return;
+        points.forEach((point) => {
+            if (!point || typeof point.lat !== 'number' || typeof point.lng !== 'number') return;
+            this.addWaypoint(point);
+        });
+    }
+
 
     _updateRoute() {
         const path = this.markers.map(m => m.getPosition());
