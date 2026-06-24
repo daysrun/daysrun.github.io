@@ -269,7 +269,6 @@ export default class MapMenu {
                     settings: this.settings,
                     onRouteChanged: (meters) => { this._lastRouteMeters = meters; }
                 });
-                this.setSelectedDistance('');
 
             } catch (err) {
                 console.error('Failed to start RoutePlanner', err);
@@ -280,7 +279,6 @@ export default class MapMenu {
                 try { this.routePlanner.destroy(); } catch (e) {}
                 this.routePlanner = null;
             }
-            this.setSelectedDistance('');
         }
     }
 
