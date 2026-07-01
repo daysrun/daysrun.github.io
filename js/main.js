@@ -138,6 +138,11 @@ function getRuntimeConfig() {
     const urlParams = new URLSearchParams(window.location.search);
     const param = urlParams.get('branch');
     const branch = param ? param : 'main';
+    // If param autoActivateLatestTrack is set, use its value to override the default setting
+    const autoActivateLatestTrackParam = urlParams.get('autoActivateLatestTrack');
+    if (autoActivateLatestTrackParam) {
+        settings.set('autoActivateLatestTrack', autoActivateLatestTrackParam.toLowerCase() === 'true');
+    }
     return {
         dataUrl: isProd ? `https://daysrun.github.io/shipslog/${branch}` : `shipslog`,
         pollInterval: isProd ? 60000 : 5000,
