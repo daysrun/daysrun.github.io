@@ -655,7 +655,24 @@ export default class MapMenu {
         // Clear and populate
         list.innerHTML = '';
         for (const t of tracks) this._addTrackRow(list, t);
+
+        // Recalculate and update the section header total distance immediately.
+        // This is needed when tracks are added/changed (e.g., live track closes and
+        // becomes part of its corresponding section).
+        if (this.settings) {
+            let totalDistanceMeters = 0;
+            const inputs = list.querySelectorAll('input[data-track-distance]');
+            inputs.forEach(input => {
+                const dist = parseFloat(input.dataset.trackDistance);
+                if (!isNaN(dist)) totalDistanceMeters += dist;
+            });
+            const targetUnit = this.settings.get('distanceUnit');
+            const totalDistance = UnitManager.convertValue('Distance', totalDistanceMeters, targetUnit);
+            const newTitle = `${entry.title} \u2014 ${totalDistance.value} ${totalDistance.unit}`;
+            entry.section.header.querySelector('span:last-child').textContent = newTitle;
+        }
     }
+
 
     /**
      * Remove a previously added section by id.
